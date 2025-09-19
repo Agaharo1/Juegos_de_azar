@@ -29,154 +29,282 @@ public class Mano {
             this.descripcion = descripcion;
         }
     }
+    
+
 
     
-    public boolean royalFlush(List<Carta> cartas2) {
-    	//cartas[i] == 1 return 
-    	return true;
-    }
     
     public Resultado evaluar() {
-    	
-    	
-    	List<String> ordenColor = new ArrayList<>();
-    	List<String> ordenValor = new ArrayList<>();
-    	ordenValor =ordenarManoValor(this.cartas);
-    	ordenColor=ordenarManoColor(this.cartas);
-    	
-    	 System.out.println("Cartas ordenadas por color: " + ordenColor);
-    	 System.out.println("Cartas ordenadas por valor: " + ordenValor);
-    	//Escalera real
-    	//if(royalFlush())
-    	Resultado res = new Resultado(null, null, null);
-        return res;
-    }
+        // Ordenamos una vez y lo usamos en todo
+        List<Carta> cartasOrdenadasValor = new ArrayList<>(cartas);
+        cartasOrdenadasValor.sort(Comparator.comparingInt(Carta::getValorNumerico));
 
-   
+        List<Carta> cartasOrdenadasColor = new ArrayList<>(cartas);
+        cartasOrdenadasColor.sort(Comparator.comparing(Carta::getPalo));
 
-    public List<String> ordenarManoColor(List<Carta> cartas) {
-        List<Carta> copia = new ArrayList<>(cartas); // copiamos la lista para no modificar la original
 
-        // ordenamos según el palo
-        copia.sort(Comparator.comparing(Carta::getPalo));
-
-        // convertimos cada carta a String
-        List<String> resultado = new ArrayList<>();
-        for (Carta c : copia) {
-            resultado.add(c.toString());
+        // De mejor a peor
+        if (esEscaleraReal(cartasOrdenadasValor)) {
+            return new Resultado(HandCategory.ROYAL_FLUSH, Collections.emptyList(),
+                    "Royal Flush (10-J-Q-K-A del mismo palo)");
+        }
+        if (esEscaleraDeColor(cartasOrdenadasValor)) {
+            return new Resultado(HandCategory.STRAIGHT_FLUSH, Collections.emptyList(),
+                    "Straight Flush");
+        }
+        if (esPoker(cartasOrdenadasValor)) {
+            return new Resultado(HandCategory.FOUR_OF_A_KIND, Collections.emptyList(),
+                    "Four of a Kind");
+        }
+        if (esFullHouse(cartasOrdenadasValor)) {
+            return new Resultado(HandCategory.FULL_HOUSE, Collections.emptyList(),
+                    "Full House");
+        }
+        if (esColor(cartasOrdenadasValor)) { // puedes pasar cartasOrdenadasValor o this.cartas, da igual
+            return new Resultado(HandCategory.FLUSH, Collections.emptyList(),
+                    "Flush");
+        }
+        if (esEscalera(cartasOrdenadasValor)) {
+            return new Resultado(HandCategory.STRAIGHT, Collections.emptyList(),
+                    "Straight");
+        }
+        if (esTrio(cartasOrdenadasValor)) {
+            return new Resultado(HandCategory.THREE_OF_A_KIND, Collections.emptyList(),
+                    "Three of a Kind");
+        }
+        if (esDoblePareja(cartasOrdenadasValor)) {
+            return new Resultado(HandCategory.TWO_PAIR, Collections.emptyList(),
+                    "Two Pair");
+        }
+        if (esPareja(cartasOrdenadasValor)) {
+            return new Resultado(HandCategory.ONE_PAIR, Collections.emptyList(),
+                    "One Pair");
         }
 
-        return resultado;
+        return new Resultado(HandCategory.HIGH_CARD, Collections.emptyList(),
+                "High Card");
     }
 
-    public List<String> ordenarManoValor(List<Carta> cartas) {
-        List<Carta> copia = new ArrayList<>(cartas); // copiamos la lista para no modificar la original
+    private boolean mismoPalo(List<Carta> cs) {
+        char p = cs.get(0).getPalo();
+        for (int i = 1; i < cs.size(); i++) {
+            if (cs.get(i).getPalo() != p) return false;
+        }
+        return true;
+    }
 
-        // ordenamos por valor
-        copia.sort(Comparator.comparingInt(Carta::getValorNumerico));
+    // 3) ¿son 5 consecutivas? Soporta A-bajo (A=14 vale como 1)
+    private boolean esSecuencia5Asc(List<Carta> ord) {
+        // Caso especial A-2-3-4-5: si hay As (14), intentamos tratarlo como 1
+        boolean tieneAs = false;
+        for (Carta c: ord) if (c.getValorNumerico() == 14) { tieneAs = true; break; }
 
-        // convertimos a String
-        List<String> resultado = new ArrayList<>();
-        for (Carta c : copia) {
-            resultado.add(c.toString());
+        // Intento normal (A alto)
+        boolean consecutiva = true;
+        for (int i = 1; i < ord.size(); i++) {
+            int prev = ord.get(i-1).getValorNumerico();
+            int curr = ord.get(i).getValorNumerico();
+            if (curr != prev + 1) { consecutiva = false; break; }
+        }
+        if (consecutiva) return true;
+
+        // Intento A-bajo: mapeamos As=14 -> 1 y re-checamos
+        if (tieneAs) {
+            int[] vals = new int[ord.size()];
+            for (int i = 0; i < ord.size(); i++) {
+                int v = ord.get(i).getValorNumerico();
+                vals[i] = (v == 14) ? 1 : v;
+            }
+            // ordenamos ese array de 5 valores
+            for (int i = 0; i < vals.length; i++) {
+                for (int j = 0; j < vals.length - 1; j++) {
+                    if (vals[j] > vals[j+1]) {
+                        int t = vals[j]; vals[j] = vals[j+1]; vals[j+1] = t;
+                    }
+                }
+            }
+            boolean ok = true;
+            for (int i = 1; i < vals.length; i++) {
+                if (vals[i] != vals[i-1] + 1) { ok = false; break; }
+            }
+            return ok;
+        }
+        return false;
+    }
+    
+    public boolean tieneGrupoIguales(List<Carta> ordenadas, int x) {
+        int contador = 1;
+        for (int i = 1; i < ordenadas.size(); i++) {
+            if (ordenadas.get(i).getValorNumerico() == ordenadas.get(i - 1).getValorNumerico()) {
+                contador++;
+                if (contador == x) return true;
+            } else {
+                contador = 1;
+            }
+        }
+        return false;
+    }
+
+    public boolean esEscaleraReal(List<Carta> cs) {
+        if (!mismoPalo(cs)) return false;
+        int[] target = {10, 11, 12, 13, 14};
+        for (int i = 0; i < 5; i++) {
+            if (cs.get(i).getValorNumerico() != target[i]) return false;
+        }
+        return true;
+    }
+
+    public boolean esEscaleraDeColor(List<Carta> cs) {
+        if (!mismoPalo(cs)) return false;
+        return esSecuencia5Asc(cs);
+    }
+    
+    public boolean esPoker(List<Carta> cs) {
+    	return tieneGrupoIguales(cs, 4);
+    }
+    
+    private int[] contarFrecuencias(List<Carta> ordenadas) {
+        int[] frecuencias = new int[15];
+        for (Carta c : ordenadas) {
+            int v = c.getValorNumerico();
+            frecuencias[v]++;
+        }
+        return frecuencias;
+    }
+    
+    public boolean esFullHouse(List<Carta> cs) {
+        int[] freq = contarFrecuencias(cs);
+        boolean tieneTrio = false;
+        boolean tienePareja = false;
+
+        for (int v = 2; v <= 14; v++) {
+            if (freq[v] == 3) tieneTrio = true;
+            else if (freq[v] == 2) tienePareja = true;
         }
 
-        return resultado;
+        return tieneTrio && tienePareja;
     }
-
-	/*========================
-      DETECCIÓN DE DRAWS
-     ========================*/
-    public List<String> detectarDraws() {
-        List<String> res = new ArrayList<>();
-        if (tieneFlushDraw()) res.add("Flush");
-        StraightDraw sd = straightDraw();
-        if (sd == StraightDraw.OPEN_ENDED) res.add("Straight Open-Ended");
-        else if (sd == StraightDraw.GUTSHOT) res.add("Straight Gutshot");
-        return res;
+    
+    public boolean esColor(List<Carta> cs) {
+        return mismoPalo(cs);
     }
-
-    private boolean tieneFlushDraw() {
-        Map<Character, Long> cuenta = cartas.stream()
-                .collect(Collectors.groupingBy(Carta::getPalo, Collectors.counting()));
-        return cuenta.values().stream().anyMatch(c -> c == 4L);
+    
+    public boolean esEscalera(List<Carta> cs) {
+    	return esSecuencia5Asc(cs);
     }
-
+    
+    public boolean esTrio(List<Carta> cs) {
+    	return tieneGrupoIguales(cs, 3);
+    }
+    
+    public boolean esDoblePareja(List<Carta> ordenadas) {
+        int[] freq = contarFrecuencias(ordenadas);
+        int parejas = 0;
+        for (int v = 2; v <= 14; v++) {
+            if (freq[v] == 2) {
+                parejas++;
+            }
+        }
+        return parejas == 2;
+    }
+    
+    public boolean esPareja(List<Carta> cs) {
+    	return tieneGrupoIguales(cs, 2);
+    }
+    
     private enum StraightDraw { NONE, OPEN_ENDED, GUTSHOT }
 
-    private StraightDraw straightDraw() {
-        // Conjuntos de valores (acepta A como 14 y 1)
-        Set<Integer> vals = cartas.stream().map(Carta::getValorNumerico).collect(Collectors.toSet());
-        if (vals.contains(14)) vals.add(1); // A como bajo
+    // Método público que devuelve una lista de strings con los draws detectados
+    public List<String> detectarDraws() {
+        List<String> out = new ArrayList<>();
+        List<Carta> ord = new ArrayList<>(cartas);
+        ord.sort(Comparator.comparingInt(Carta::getValorNumerico));
 
-        StraightInfo si = straightInfo(cartas);
-        if (si.isStraight) return StraightDraw.NONE; // ya es escalera completa
+        // Straight draws
+        StraightDraw sd = straightDraw(ord);
+        if (sd == StraightDraw.OPEN_ENDED) out.add("Straight Open-Ended");
+        else if (sd == StraightDraw.GUTSHOT) out.add("Straight Gutshot");
 
-        // Ventanas posibles de 5 consecutivos
-        for (int start = 1; start <= 10; start++) {
-            int missing = 0;
-            boolean missAtEndLow = !vals.contains(start);
-            boolean missAtEndHigh = !vals.contains(start + 4);
-            for (int r = start; r <= start + 4; r++) {
-                if (!vals.contains(r)) missing++;
+        // Flush draw (4 cartas del mismo palo)
+        if (tieneFlushDraw(cartas)) out.add("Flush");
+
+        return out;
+    }
+
+    private StraightDraw straightDraw(List<Carta> ordAscPorValor) {
+        int[] base = valoresUnicosAsc(ordAscPorValor);
+
+        StraightDraw d = straightDrawSobreValores(base);
+        if (d != StraightDraw.NONE) return d;
+        boolean tieneAs = false;
+        for (int v : base) if (v == 14) { tieneAs = true; break; }
+        if (!tieneAs) return StraightDraw.NONE;
+
+        int[] alt = new int[base.length];
+        for (int i = 0; i < base.length; i++) alt[i] = (base[i] == 14) ? 1 : base[i];
+
+        // ordenar alt (burbuja)
+        for (int i = 0; i < alt.length; i++) {
+            for (int j = 0; j < alt.length - 1; j++) {
+                if (alt[j] > alt[j+1]) {
+                    int t=alt[j];
+                    alt[j]=alt[j+1];
+                    alt[j+1]=t;
+                }
             }
-            if (missing == 1) {
-                if (missAtEndLow || missAtEndHigh) return StraightDraw.OPEN_ENDED;
-                else return StraightDraw.GUTSHOT;
+        }
+
+        return straightDrawSobreValores(alt);
+    }
+
+    private StraightDraw straightDrawSobreValores(int[] vals) {
+        for (int start = 1; start <= 10; start++) {
+            boolean[] present = new boolean[5];
+            int dentro = 0;
+            for (int v : vals) {
+                if (v >= start && v <= start + 4) {
+                    present[v - start] = true;
+                    dentro++;
+                }
+            }
+            if (dentro == 4) {
+                int miss = -1;
+                for (int i = 0; i < 5; i++) if (!present[i]) { miss = i; break; }
+                return (miss == 0 || miss == 4) ? StraightDraw.OPEN_ENDED : StraightDraw.GUTSHOT;
             }
         }
         return StraightDraw.NONE;
     }
 
-    /*========================
-      HELPERS
-     ========================*/
-    private static class StraightInfo {
-        final boolean isStraight;
-        final int topRank; // 5 para A2345, 14 para TJQKA, etc.
-        StraightInfo(boolean ok, int top) { this.isStraight = ok; this.topRank = top; }
-    }
-
-    private static StraightInfo straightInfo(List<Carta> cards) {
-        // únicos y ordenados ascendentemente
-        Set<Integer> set = cards.stream().map(Carta::getValorNumerico).collect(Collectors.toCollection(TreeSet::new));
-        // Caso A bajo: añade 1 si hay As
-        if (set.contains(14)) set.add(1);
-
-        List<Integer> vals = new ArrayList<>(set);
-        // busca 5 consecutivos
-        int run = 1, bestTop = -1;
-        for (int i = 1; i < vals.size(); i++) {
-            if (vals.get(i) == vals.get(i - 1) + 1) {
-                run++;
-                if (run >= 5) bestTop = Math.max(bestTop, vals.get(i)); // top rank
-            } else {
-                run = 1;
+    private int[] valoresUnicosAsc(List<Carta> ord) {
+        int[] tmp = new int[5];
+        int n = 0;
+        int last = -999;
+        for (Carta c : ord) {
+            int v = c.getValorNumerico();
+            if (n == 0 || v != last) {
+                tmp[n++] = v;
+                last = v;
             }
         }
-        if (bestTop == -1) return new StraightInfo(false, -1);
-        // Ajuste: si top=5 y hay A bajo, representa A2345 -> topRank=5
-        return new StraightInfo(true, bestTop == 5 ? 5 : bestTop);
+        int[] res = new int[n];
+        for (int i = 0; i < n; i++) res[i] = tmp[i];
+        return res;
     }
 
-    private static List<Carta> cartasOrdenadasDesc(List<Carta> cs) {
-        return cs.stream()
-                .sorted(Comparator.comparingInt(Carta::getValorNumerico).reversed())
-                .collect(Collectors.toList());
+    private boolean tieneFlushDraw(List<Carta> cs) {
+        int h=0,d=0,c=0,s=0;
+        for (Carta x: cs) {
+            switch (x.getPalo()) {
+                case 'h': h++; break;
+                case 'd': d++; break;
+                case 'c': c++; break;
+                case 's': s++; break;
+            }
         }
-
-    private static List<Integer> kickerExcluyendo(Map<Integer, List<Carta>> porValor, int... excluir) {
-        Set<Integer> ex = Arrays.stream(excluir).boxed().collect(Collectors.toSet());
-        return porValor.entrySet().stream()
-                .filter(e -> !ex.contains(e.getKey()))
-                .sorted((a, b) -> {
-                    int cmp = Integer.compare(b.getKey(), a.getKey());
-                    if (cmp != 0) return cmp;
-                    return Integer.compare(b.getValue().size(), a.getValue().size());
-                })
-                .flatMap(e -> Collections.nCopies(e.getValue().size(), e.getKey()).stream())
-                .collect(Collectors.toList());
+        return (h==4 || d==4 || c==4 || s==4);
     }
+
 
     private static String rangoToTexto(int r) {
         if (r == 14) return "Ace";
@@ -198,9 +326,6 @@ public class Mano {
         }
     }
 
-    /*========================
-      PARSER DE 10 CARACTERES
-     ========================*/
     public static Mano desdeString10(String linea) {
         if (linea == null || linea.length() != 10) {
             throw new IllegalArgumentException("La línea debe tener exactamente 10 caracteres (5 cartas)");

@@ -2,7 +2,7 @@ package poker;
 
 public class Main {
     public static void main(String[] args) {
-        Mano m = Mano.desdeString10("Ah2d7hJd3h");
+        Mano m = Mano.desdeString10("AhAdQhJhTh");
         Mano.Resultado r = m.evaluar();
 
         System.out.println("Best hand: " + r.descripcion);
