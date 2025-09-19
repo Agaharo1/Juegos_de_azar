@@ -29,60 +29,160 @@ public class Mano {
             this.descripcion = descripcion;
         }
     }
+    
+
 
     
-    public boolean royalFlush(List<Carta> cartas2) {
-    	//cartas[i] == 1 return 
-    	return true;
-    }
     
     public Resultado evaluar() {
-    	
-    	
-    	List<String> ordenColor = new ArrayList<>();
-    	List<String> ordenValor = new ArrayList<>();
-    	ordenValor =ordenarManoValor(this.cartas);
-    	ordenColor=ordenarManoColor(this.cartas);
-    	
-    	 System.out.println("Cartas ordenadas por color: " + ordenColor);
-    	 System.out.println("Cartas ordenadas por valor: " + ordenValor);
-    	//Escalera real
-    	//if(royalFlush())
-    	Resultado res = new Resultado(null, null, null);
-        return res;
-    }
+        // Ordenamos una vez y lo usamos en todo
+        List<Carta> cartasOrdenadasValor = new ArrayList<>(cartas);
+        cartasOrdenadasValor.sort(Comparator.comparingInt(Carta::getValorNumerico));
+        List<Carta> cartasOrdenadasColor = new ArrayList<>(cartas);
+        cartasOrdenadasColor.sort(Comparator.comparing(Carta::getPalo));
 
-   
+        // Prints de debug (puedes quitarlos luego)
+        System.out.print("Cartas ordenadas por valor: ");
+        for (Carta c : cartasOrdenadasValor) System.out.print(c + " ");
+        System.out.println();
 
-    public List<String> ordenarManoColor(List<Carta> cartas) {
-        List<Carta> copia = new ArrayList<>(cartas); // copiamos la lista para no modificar la original
+        System.out.print("Cartas ordenadas por color: ");
+        for (Carta c : cartasOrdenadasColor) System.out.print(c + " ");
+        System.out.println();
 
-        // ordenamos según el palo
-        copia.sort(Comparator.comparing(Carta::getPalo));
-
-        // convertimos cada carta a String
-        List<String> resultado = new ArrayList<>();
-        for (Carta c : copia) {
-            resultado.add(c.toString());
+        // Ahora comprobamos manos de mejor a peor
+        if (esEscaleraReal(cartasOrdenadasValor)) {
+            return new Resultado(
+                HandCategory.ROYAL_FLUSH,
+                Collections.emptyList(),
+                "Royal Flush (10-J-Q-K-A del mismo palo)"
+            );
         }
 
-        return resultado;
-    }
-
-    public List<String> ordenarManoValor(List<Carta> cartas) {
-        List<Carta> copia = new ArrayList<>(cartas); // copiamos la lista para no modificar la original
-
-        // ordenamos por valor
-        copia.sort(Comparator.comparingInt(Carta::getValorNumerico));
-
-        // convertimos a String
-        List<String> resultado = new ArrayList<>();
-        for (Carta c : copia) {
-            resultado.add(c.toString());
+        if (esEscaleraDeColor(cartasOrdenadasValor)) {
+            return new Resultado(
+                HandCategory.STRAIGHT_FLUSH,
+                Collections.emptyList(),
+                "Straight Flush (cinco consecutivas del mismo palo)"
+            );
         }
 
-        return resultado;
+        // Aquí seguiríamos con Four of a Kind, Full House, Flush, etc.
+        return new Resultado(
+            HandCategory.HIGH_CARD,
+            Collections.emptyList(),
+            "High Card"
+        );
     }
+    
+    private boolean mismoPalo(List<Carta> cs) {
+        char p = cs.get(0).getPalo();
+        for (int i = 1; i < cs.size(); i++) {
+            if (cs.get(i).getPalo() != p) return false;
+        }
+        return true;
+    }
+
+    
+
+    // 3) ¿son 5 consecutivas? Soporta A-bajo (A=14 vale como 1)
+    private boolean esSecuencia5Asc(List<Carta> ord) {
+        // Caso especial A-2-3-4-5: si hay As (14), intentamos tratarlo como 1
+        boolean tieneAs = false;
+        for (Carta c: ord) if (c.getValorNumerico() == 14) { tieneAs = true; break; }
+
+        // Intento normal (A alto)
+        boolean consecutiva = true;
+        for (int i = 1; i < ord.size(); i++) {
+            int prev = ord.get(i-1).getValorNumerico();
+            int curr = ord.get(i).getValorNumerico();
+            if (curr != prev + 1) { consecutiva = false; break; }
+        }
+        if (consecutiva) return true;
+
+        // Intento A-bajo: mapeamos As=14 -> 1 y re-checamos
+        if (tieneAs) {
+            int[] vals = new int[ord.size()];
+            for (int i = 0; i < ord.size(); i++) {
+                int v = ord.get(i).getValorNumerico();
+                vals[i] = (v == 14) ? 1 : v;
+            }
+            // ordenamos ese array de 5 valores
+            for (int i = 0; i < vals.length; i++) {
+                for (int j = 0; j < vals.length - 1; j++) {
+                    if (vals[j] > vals[j+1]) {
+                        int t = vals[j]; vals[j] = vals[j+1]; vals[j+1] = t;
+                    }
+                }
+            }
+            boolean ok = true;
+            for (int i = 1; i < vals.length; i++) {
+                if (vals[i] != vals[i-1] + 1) { ok = false; break; }
+            }
+            return ok;
+        }
+        return false;
+    }
+    
+    public boolean tieneGrupoIguales(List<Carta> ordenadas, int x) {
+        int contador = 1;
+        for (int i = 1; i < ordenadas.size(); i++) {
+            if (ordenadas.get(i).getValorNumerico() == ordenadas.get(i - 1).getValorNumerico()) {
+                contador++;
+                if (contador == x) return true;
+            } else {
+                contador = 1;
+            }
+        }
+        return false;
+    }
+
+    public boolean esEscaleraReal(List<Carta> cs) {
+        if (!mismoPalo(cs)) return false;
+        int[] target = {10, 11, 12, 13, 14};
+        for (int i = 0; i < 5; i++) {
+            if (cs.get(i).getValorNumerico() != target[i]) return false;
+        }
+        return true;
+    }
+
+    public boolean esEscaleraDeColor(List<Carta> cs) {
+        if (!mismoPalo(cs)) return false;
+        return esSecuencia5Asc(cs);
+    }
+    
+    public boolean esPoker(List<Carta> cs) {
+    	if(tieneGrupoIguales(cs, 4)) return true;
+    	else return false;
+    }
+    
+    private int[] contarFrecuencias(List<Carta> ordenadas) {
+        int[] frecuencias = new int[15];
+        for (Carta c : ordenadas) {
+            int v = c.getValorNumerico();
+            frecuencias[v]++;
+        }
+        return frecuencias;
+    }
+    
+    public boolean esFullHouse(List<Carta> cs) {
+        int[] freq = contarFrecuencias(cs);
+        boolean tieneTrio = false;
+        boolean tienePareja = false;
+
+        for (int v = 2; v <= 14; v++) {
+            if (freq[v] == 3) tieneTrio = true;
+            else if (freq[v] == 2) tienePareja = true;
+        }
+
+        return tieneTrio && tienePareja;
+    }
+    
+    public boolean esColor(List<Carta> cs) {
+        if(mismoPalo(cs)) return true;
+        else return false;
+    }
+
 
 	/*========================
       DETECCIÓN DE DRAWS
