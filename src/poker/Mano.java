@@ -215,27 +215,51 @@ public class Mano {
     private enum StraightDraw { NONE, OPEN_ENDED, GUTSHOT }
 
     // Método público que devuelve una lista de strings con los draws detectados
+    
     public List<String> detectarDraws() {
         List<String> out = new ArrayList<>();
         List<Carta> ord = new ArrayList<>(cartas);
         ord.sort(Comparator.comparingInt(Carta::getValorNumerico));
 
-        // Straight draws
-        StraightDraw sd = straightDraw(ord);
-        if (sd == StraightDraw.OPEN_ENDED) out.add("Straight Open-Ended");
-        else if (sd == StraightDraw.GUTSHOT) out.add("Straight Gutshot");
+        boolean royal   = esEscaleraReal(ord);
+        boolean sf      = esEscaleraDeColor(ord);
+        boolean str     = esEscalera(ord);
+        boolean flush   = esColor(cartas);
 
-        // Flush draw (4 cartas del mismo palo)
-        if (tieneFlushDraw(cartas)) out.add("Flush");
+        if (!royal && !sf && !flush) {
+            if (tieneFlushDraw(cartas)) out.add("Flush");
+        }
+
+        if (!royal && !sf && !str) {
+            int unicos = valoresUnicosAsc(ord).length;
+
+            boolean esPareja = tieneGrupoIguales(ord, 2);
+            boolean esTrio   = tieneGrupoIguales(ord, 3);
+            boolean esPoker  = tieneGrupoIguales(ord, 4);
+
+            boolean esDoblePareja = false;
+            if (unicos == 3 && !esTrio) esDoblePareja = true;
+
+            boolean esHighCard = (unicos == 5);
+            boolean esOnePair  = esPareja && !esTrio && !esPoker && !esDoblePareja;
+
+            if (esHighCard || esOnePair) {
+                StraightDraw sd = straightDraw(ord);
+                if (sd == StraightDraw.OPEN_ENDED) out.add("Straight Open-Ended");
+                else if (sd == StraightDraw.GUTSHOT) out.add("Straight Gutshot");
+            }
+        }
 
         return out;
     }
 
     private StraightDraw straightDraw(List<Carta> ordAscPorValor) {
-        int[] base = valoresUnicosAsc(ordAscPorValor);
+        if (esSecuencia5Asc(ordAscPorValor)) return StraightDraw.NONE;
 
+        int[] base = valoresUnicosAsc(ordAscPorValor);
         StraightDraw d = straightDrawSobreValores(base);
         if (d != StraightDraw.NONE) return d;
+
         boolean tieneAs = false;
         for (int v : base) if (v == 14) { tieneAs = true; break; }
         if (!tieneAs) return StraightDraw.NONE;
@@ -243,19 +267,13 @@ public class Mano {
         int[] alt = new int[base.length];
         for (int i = 0; i < base.length; i++) alt[i] = (base[i] == 14) ? 1 : base[i];
 
-        // ordenar alt (burbuja)
-        for (int i = 0; i < alt.length; i++) {
-            for (int j = 0; j < alt.length - 1; j++) {
-                if (alt[j] > alt[j+1]) {
-                    int t=alt[j];
-                    alt[j]=alt[j+1];
-                    alt[j+1]=t;
-                }
-            }
-        }
+        for (int i = 0; i < alt.length; i++)
+            for (int j = 0; j < alt.length - 1; j++)
+                if (alt[j] > alt[j+1]) { int t=alt[j]; alt[j]=alt[j+1]; alt[j+1]=t; }
 
         return straightDrawSobreValores(alt);
     }
+
 
     private StraightDraw straightDrawSobreValores(int[] vals) {
         for (int start = 1; start <= 10; start++) {
