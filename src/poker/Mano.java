@@ -35,54 +35,102 @@ public class Mano {
     
     
     public Resultado evaluar() {
-        // Ordenamos una vez y lo usamos en todo
-        List<Carta> cartasOrdenadasValor = new ArrayList<>(cartas);
-        cartasOrdenadasValor.sort(Comparator.comparingInt(Carta::getValorNumerico));
+        List<Carta> ordenadas = new ArrayList<>(cartas);
+        ordenadas.sort(Comparator.comparingInt(Carta::getValorNumerico));
 
-        List<Carta> cartasOrdenadasColor = new ArrayList<>(cartas);
-        cartasOrdenadasColor.sort(Comparator.comparing(Carta::getPalo));
-
-
-        // De mejor a peor
-        if (esEscaleraReal(cartasOrdenadasValor)) {
+        if (esEscaleraReal(ordenadas)) {
             return new Resultado(HandCategory.ROYAL_FLUSH, Collections.emptyList(),
-                    "Royal Flush (10-J-Q-K-A del mismo palo)");
+                    "Royal Flush");
         }
-        if (esEscaleraDeColor(cartasOrdenadasValor)) {
-            return new Resultado(HandCategory.STRAIGHT_FLUSH, Collections.emptyList(),
-                    "Straight Flush");
+        
+        if (esEscaleraDeColor(ordenadas)) {
+            int high = ordenadas.get(4).getValorNumerico(); // la última es la más alta
+            return new Resultado(HandCategory.STRAIGHT_FLUSH,
+                    Arrays.asList(high), "Straight Flush");
         }
-        if (esPoker(cartasOrdenadasValor)) {
-            return new Resultado(HandCategory.FOUR_OF_A_KIND, Collections.emptyList(),
-                    "Four of a Kind");
+        
+        if (esPoker(ordenadas)) {
+            int[] freq = contarFrecuencias(ordenadas);
+            int valorPoker = 0, kicker = 0;
+            for (int v = 2; v <= 14; v++) {
+                if (freq[v] == 4) valorPoker = v;
+                if (freq[v] == 1) kicker = v;
+            }
+            return new Resultado(HandCategory.FOUR_OF_A_KIND,
+                    Arrays.asList(valorPoker, kicker), "Four of a Kind");
         }
-        if (esFullHouse(cartasOrdenadasValor)) {
-            return new Resultado(HandCategory.FULL_HOUSE, Collections.emptyList(),
-                    "Full House");
+        
+        if (esFullHouse(ordenadas)) {
+            int[] freq = contarFrecuencias(ordenadas);
+            int trio = 0, par = 0;
+            for (int v = 2; v <= 14; v++) {
+                if (freq[v] == 3) trio = v;
+                if (freq[v] == 2) par = v;
+            }
+            return new Resultado(HandCategory.FULL_HOUSE,
+                    Arrays.asList(trio, par), "Full House");
         }
-        if (esColor(cartasOrdenadasValor)) { // puedes pasar cartasOrdenadasValor o this.cartas, da igual
-            return new Resultado(HandCategory.FLUSH, Collections.emptyList(),
-                    "Flush");
+        
+        if (esColor(ordenadas)) {
+            return new Resultado(HandCategory.FLUSH,
+                    desempateHighCard(ordenadas), "Flush");
         }
-        if (esEscalera(cartasOrdenadasValor)) {
-            return new Resultado(HandCategory.STRAIGHT, Collections.emptyList(),
-                    "Straight");
+        
+        if (esEscalera(ordenadas)) {
+            int high = ordenadas.get(4).getValorNumerico();
+            // caso especial A-2-3-4-5 → high=5
+            if (ordenadas.get(4).getValorNumerico() == 14 &&
+                ordenadas.get(0).getValorNumerico() == 2) {
+                high = 5;
+            }
+            return new Resultado(HandCategory.STRAIGHT,
+                    Arrays.asList(high), "Straight");
         }
-        if (esTrio(cartasOrdenadasValor)) {
-            return new Resultado(HandCategory.THREE_OF_A_KIND, Collections.emptyList(),
-                    "Three of a Kind");
+        
+        if (esTrio(ordenadas)) {
+            int[] freq = contarFrecuencias(ordenadas);
+            int trio = 0;
+            List<Integer> kickers = new ArrayList<>();
+            for (int v = 14; v >= 2; v--) {
+                if (freq[v] == 3) trio = v;
+                else if (freq[v] == 1) kickers.add(v);
+            }
+            List<Integer> d = new ArrayList<>();
+            d.add(trio);
+            d.addAll(kickers);
+            return new Resultado(HandCategory.THREE_OF_A_KIND, d, "Three of a Kind");
         }
-        if (esDoblePareja(cartasOrdenadasValor)) {
-            return new Resultado(HandCategory.TWO_PAIR, Collections.emptyList(),
-                    "Two Pair");
+        
+        if (esDoblePareja(ordenadas)) {
+            int[] freq = contarFrecuencias(ordenadas);
+            List<Integer> pares = new ArrayList<>();
+            int kicker = 0;
+            for (int v = 14; v >= 2; v--) {
+                if (freq[v] == 2) pares.add(v);
+                else if (freq[v] == 1) kicker = v;
+            }
+            List<Integer> d = new ArrayList<>();
+            d.addAll(pares); // ya están en orden descendente
+            d.add(kicker);
+            return new Resultado(HandCategory.TWO_PAIR, d, "Two Pair");
         }
-        if (esPareja(cartasOrdenadasValor)) {
-            return new Resultado(HandCategory.ONE_PAIR, Collections.emptyList(),
-                    "One Pair");
+        
+        if (esPareja(ordenadas)) {
+            int[] freq = contarFrecuencias(ordenadas);
+            int par = 0;
+            List<Integer> kickers = new ArrayList<>();
+            for (int v = 14; v >= 2; v--) {
+                if (freq[v] == 2) par = v;
+                else if (freq[v] == 1) kickers.add(v);
+            }
+            List<Integer> d = new ArrayList<>();
+            d.add(par);
+            d.addAll(kickers);
+            return new Resultado(HandCategory.ONE_PAIR, d, "One Pair");
         }
 
-        return new Resultado(HandCategory.HIGH_CARD, Collections.emptyList(),
-                "High Card");
+        return new Resultado(HandCategory.HIGH_CARD,
+                desempateHighCard(ordenadas), "High Card");
     }
 
     private boolean mismoPalo(List<Carta> cs) {
@@ -354,4 +402,13 @@ public class Mano {
         }
         return new Mano(cs);
     }
+    
+    private List<Integer> desempateHighCard(List<Carta> ordenadas) {
+        List<Integer> out = new ArrayList<>();
+        for (int i = ordenadas.size()-1; i >= 0; i--) {
+            out.add(ordenadas.get(i).getValorNumerico());
+        }
+        return out;
+    }
+
 }
