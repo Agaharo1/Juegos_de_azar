@@ -3,6 +3,72 @@ package poker;
 import java.util.*;
 
 public class Utils {
+	
+	// Convierte un número de carta a texto
+    public static String valorToTexto(int v) {
+        switch (v) {
+            case 14: return "Aces";
+            case 13: return "Kings";
+            case 12: return "Queens";
+            case 11: return "Jacks";
+            case 10: return "Tens";
+            default: return v + "s";
+        }
+    }
+
+    // Genera descripción detallada en función de la categoría y desempate
+    public static String descripcionDetallada(Mano.Resultado r) {
+        switch (r.categoria) {
+            case ONE_PAIR:
+                return "Pair of " + valorToTexto(r.desempate.get(0));
+            case TWO_PAIR:
+                return "Two Pair (" + valorToTexto(r.desempate.get(0))
+                       + " and " + valorToTexto(r.desempate.get(1)) + ")";
+            case THREE_OF_A_KIND:
+                return "Three of " + valorToTexto(r.desempate.get(0));
+            case FOUR_OF_A_KIND:
+                return "Four of " + valorToTexto(r.desempate.get(0));
+            case FULL_HOUSE:
+                return "Full House (" + valorToTexto(r.desempate.get(0))
+                       + " over " + valorToTexto(r.desempate.get(1)) + ")";
+            default:
+                // para los demás usamos la descripción original
+                return r.descripcion;
+        }
+    }
+
+	
+    public static Partida parseLineaApartado3(String linea) {
+        String[] partes = linea.trim().split(";");
+        int n = Integer.parseInt(partes[0]);
+
+        List<String> ids = new ArrayList<>();
+        List<List<Carta>> manos = new ArrayList<>();
+
+        // jugadores
+        for (int i = 1; i <= n; i++) {
+            String token = partes[i];      // ej: "J1AhAc"
+            String id = token.substring(0, 2); // "J1"
+            ids.add(id);
+
+            String cartasStr = token.substring(2); // "AhAc"
+            List<Carta> hole = new ArrayList<>();
+            for (int j = 0; j < cartasStr.length(); j += 2) {
+                hole.add(new Carta(cartasStr.charAt(j), cartasStr.charAt(j + 1)));
+            }
+            manos.add(hole);
+        }
+
+        // comunes
+        String comunesStr = partes[n + 1];
+        List<Carta> comunes = new ArrayList<>();
+        for (int i = 0; i < comunesStr.length(); i += 2) {
+            comunes.add(new Carta(comunesStr.charAt(i), comunesStr.charAt(i + 1)));
+        }
+
+        return new Partida(n, ids, manos, comunes);
+    }
+
 
     public static List<Carta> parseLineaApartado2(String linea) {
         String[] partes = linea.split(";");
@@ -57,7 +123,7 @@ public class Utils {
             return cmp > 0; // porque el enum está ordenado de peor a mejor
         }
         // si empatan, comparar listas de enteros
-        for (int i = 0; i < Math.min(a.desempate.size(), b.desempate.size()); i++) {
+        for (int i = 0; i < a.desempate.size(); i++) {
             if (!a.desempate.get(i).equals(b.desempate.get(i))) {
                 return a.desempate.get(i) > b.desempate.get(i);
             }
