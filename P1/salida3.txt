@@ -1,0 +1,25 @@
+4;J1AhAc;J2JsJh;J37c8c;J44sKc;5dKs6cTh9h 
+J3: [7c, 8c, 6c, Th, 9h] (Straight)
+J1: [Ah, Ac, Ks, Th, 9h] (Pair of Aces)
+J4: [Kc, Ks, 6c, Th, 9h] (Pair of Kings)
+J2: [Js, Jh, Ks, Th, 9h] (Pair of Jacks)
+
+3;J1TsAh;J2ThKc;J3Ks9s;8sKhTcTd9d
+J2: [Th, Kc, Kh, Tc, Td] (Full House (Tens over Kings))
+J1: [Ts, Ah, Kh, Tc, Td] (Three of Tens)
+J3: [Ks, Kh, Tc, Td, 9d] (Two Pair (Kings and Tens))
+
+6;J12s3c;J22c3s;J32h3d;J42d3h;J54s5c;J64c5s;AhKcQsTd9s
+J1: [Ah, Kc, Qs, Td, 9s] (High Card)
+J2: [Ah, Kc, Qs, Td, 9s] (High Card)
+J3: [Ah, Kc, Qs, Td, 9s] (High Card)
+J4: [Ah, Kc, Qs, Td, 9s] (High Card)
+J5: [Ah, Kc, Qs, Td, 9s] (High Card)
+J6: [Ah, Kc, Qs, Td, 9s] (High Card)
+
+4;J1Ah9c;J2Kh9s;J3Qh9h;J4Jh9d;5h7hTh2h5c
+J1: [Ah, 5h, 7h, Th, 2h] (Flush)
+J2: [Kh, 5h, 7h, Th, 2h] (Flush)
+J3: [Qh, 9h, 5h, 7h, Th] (Flush)
+J4: [Jh, 5h, 7h, Th, 2h] (Flush)
+

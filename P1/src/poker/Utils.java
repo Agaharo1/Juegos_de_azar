@@ -37,6 +37,17 @@ public class Utils {
         }
     }
 
+    public static String cartasAString(List<Carta> cartas) {
+        if (cartas == null) return "[]";
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < cartas.size(); i++) {
+            sb.append(cartas.get(i).toString());
+            if (i < cartas.size() - 1) sb.append(" ");
+        }
+        sb.append("]");
+        return sb.toString();
+    }
+
 	
     public static Partida parseLineaApartado3(String linea) {
         String[] partes = linea.trim().split(";");
