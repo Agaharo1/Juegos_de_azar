@@ -1,4 +1,4 @@
-package GUI;
+package tp2.gui;
 
 import javax.swing.*;
 import javax.swing.border.*;
