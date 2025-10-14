@@ -1,13 +1,13 @@
 package tp2.gui;
 
 import javax.swing.*;
-import javax.swing.border.*;
+import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.*;
 
 public class PlayerPanel extends JPanel {
-    private String playerName;
-    private boolean isHero;
+    private final String playerName;
+    private final boolean isHero;
     private String cards = "";
     private JLabel equityField;
     private CardsPanel cardsPanel;
@@ -50,10 +50,8 @@ public class PlayerPanel extends JPanel {
                 super.paintComponent(g);
                 Graphics2D g2 = (Graphics2D) g;
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
                 g2.setColor(new Color(34, 150, 255));
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 20, 20);
-
                 g2.setColor(new Color(20, 100, 200));
                 g2.setStroke(new BasicStroke(2));
                 g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 20, 20);
@@ -67,8 +65,7 @@ public class PlayerPanel extends JPanel {
         equityField.setForeground(Color.WHITE);
         equityField.setFont(new Font("Segoe UI", Font.BOLD, 18));
         equityField.setOpaque(false);
-        equityField.setBackground(new Color(0, 0, 0, 0));
-        
+
         equityPanel.add(equityField, BorderLayout.CENTER);
         bottomPanel.add(equityPanel);
         add(bottomPanel, BorderLayout.SOUTH);
@@ -90,42 +87,46 @@ public class PlayerPanel extends JPanel {
         equityField.setText("0.0%");
     }
 
+    /** Panel que pinta las 2 cartas del jugador */
     class CardsPanel extends JPanel {
         private String cards = "";
-        
-        public void setCards(String cards) { 
-            this.cards = cards; 
-            setBackground(new Color(34,60,85)); 
-            repaint(); 
+
+        public void setCards(String cards) {
+            this.cards = cards;
+            setBackground(new Color(34,60,85));
+            repaint();
         }
 
         @Override
         protected void paintComponent(Graphics g) {
             super.paintComponent(g);
-            if(cards.length()>=4){
+            if (cards != null && cards.length() >= 4) {
                 Graphics2D g2 = (Graphics2D) g;
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-                String card1 = cards.substring(0,2);
-                String card2 = cards.substring(2,4);
+                String card1 = cards.substring(0, 2);
+                String card2 = cards.substring(2, 4);
+
                 Image img1 = loadCardImage(card1);
                 Image img2 = loadCardImage(card2);
 
-                int w = (int)(getWidth()*0.45);
-                int h = (int)(getHeight()*0.85);
-                int overlap = (int)(w*1.1);
-                int y = (getHeight()-h)/2;
+                int w = (int) (getWidth() * 0.45);
+                int h = (int) (getHeight() * 0.85);
+                int overlap = (int) (w * 1.1);
+                int y = (getHeight() - h) / 2;
 
-                if(img1!=null) g2.drawImage(img1,5,y,w,h,this);
-                if(img2!=null) g2.drawImage(img2,5+overlap,y,w,h,this);
+                if (img1 != null) g2.drawImage(img1, 5, y, w, h, this);
+                if (img2 != null) g2.drawImage(img2, 5 + overlap, y, w, h, this);
             }
         }
 
+
         private Image loadCardImage(String code){
-            String path = "resources/cartas/"+code+".png";
-            java.io.File file = new java.io.File(path);
-            if(file.exists()) return new ImageIcon(path).getImage();
-            else return null;
+            String path = "/cartas/" + code + ".png";
+            java.net.URL url = getClass().getResource(path);
+            System.out.println("DEBUG URL=" + url);
+            if (url == null) return null;
+            return new ImageIcon(url).getImage();
         }
     }
 }

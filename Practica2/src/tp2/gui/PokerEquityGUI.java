@@ -106,15 +106,14 @@ public class PokerEquityGUI extends JFrame {
         }
     }
 
-    private Image loadCardImage(String code) {
-        String path = "resources/cartas/" + code + ".png";
-        java.io.File file = new java.io.File(path);
-        if (file.exists()) {
-            return new ImageIcon(path).getImage();
-        } else {
-            return null;
-        }
+    private Image loadCardImage(String code){
+        String path = "/cartas/" + code + ".png";
+        java.net.URL url = getClass().getResource(path);
+        System.out.println("DEBUG URL=" + url);
+        if (url == null) return null;
+        return new ImageIcon(url).getImage();
     }
+
 
     private void createPlayerPanels(JPanel tablePanel) {
         tablePanel.addComponentListener(new java.awt.event.ComponentAdapter() {
