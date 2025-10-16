@@ -1,8 +1,0 @@
-AhAc;3;QhJhTh
- - Best hand: One Pair with [Ah, Ac, Qh, Jh, Th]
- - Draw: Flush
- - Draw: Straight Gutshot
-
-AhAc;5;As2s3h4dJd
- - Best hand: Three of a Kind with [Ah, Ac, As, 4d, Jd]
-
