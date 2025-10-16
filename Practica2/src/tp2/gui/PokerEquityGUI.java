@@ -7,7 +7,7 @@ import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.List;
 
-import poker.RangeParser; //Añadido por ahora para que funcione el RRangeParser, no se si está bien
+import tp2.logic.RangeParser; //Añadido por ahora para que funcione el RRangeParser, no se si está bien
 
 
 public class PokerEquityGUI extends JFrame {
