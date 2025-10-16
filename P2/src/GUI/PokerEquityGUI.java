@@ -7,6 +7,9 @@ import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.List;
 
+import poker.RangeParser; //Añadido por ahora para que funcione el RRangeParser, no se si está bien
+
+
 public class PokerEquityGUI extends JFrame {
     private JPanel mainPanel;
     private JPanel tablePanel;
@@ -188,6 +191,35 @@ public class PokerEquityGUI extends JFrame {
             btn.addActionListener(e -> actions[idx].run());
             buttonPanel.add(btn);
         }
+        
+     // === BOTÓN NUEVO: Comprobar rango ===
+        JButton btnComprobar = createStyledButton("Comprobar rango");
+        btnComprobar.addActionListener(e -> {
+            String rango = JOptionPane.showInputDialog(this,
+                    "Introduce un rango (por ejemplo: AA,KK,AKs):",
+                    "Comprobar rango", JOptionPane.PLAIN_MESSAGE);
+
+            if (rango != null && !rango.isEmpty()) {
+                try {
+                    // Aquí he creado la clase RangeParser para que funcione
+                    List<String> manos = RangeParser.parse(rango);
+
+                    JOptionPane.showMessageDialog(this,
+                            "Rango introducido:\n" + manos,
+                            "Resultado del RangeParser",
+                            JOptionPane.INFORMATION_MESSAGE);
+
+                    System.out.println("Rango introducido: " + manos);
+
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(this,
+                            "Error al analizar el rango: " + ex.getMessage(),
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        });
+        buttonPanel.add(btnComprobar);
+
 
         panel.add(buttonPanel, BorderLayout.EAST);
         return panel;
