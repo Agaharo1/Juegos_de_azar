@@ -1,0 +1,21 @@
+﻿# Eclipse / Java
+/bin/
+/target/
+/out/
+/*.class
+*.log
+
+# IDE configs
+/.classpath
+/.project
+/.settings/
+/.idea/
+/.vscode/
+/*.iml
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Otros
+*.jar

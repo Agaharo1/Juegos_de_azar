@@ -1,4 +1,4 @@
-package GUI;
+package tp2.gui;
 
 import javax.swing.*;
 import javax.swing.border.*;
@@ -6,6 +6,9 @@ import java.awt.*;
 import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.List;
+
+import tp2.logic.RangeParser; //Añadido por ahora para que funcione el RRangeParser, no se si está bien
+
 
 public class PokerEquityGUI extends JFrame {
     private JPanel mainPanel;
@@ -106,15 +109,14 @@ public class PokerEquityGUI extends JFrame {
         }
     }
 
-    private Image loadCardImage(String code) {
-        String path = "resources/cartas/" + code + ".png";
-        java.io.File file = new java.io.File(path);
-        if (file.exists()) {
-            return new ImageIcon(path).getImage();
-        } else {
-            return null;
-        }
+    private Image loadCardImage(String code){
+        String path = "/cartas/" + code + ".png";
+        java.net.URL url = getClass().getResource(path);
+        System.out.println("DEBUG URL=" + url);
+        if (url == null) return null;
+        return new ImageIcon(url).getImage();
     }
+
 
     private void createPlayerPanels(JPanel tablePanel) {
         tablePanel.addComponentListener(new java.awt.event.ComponentAdapter() {
@@ -188,6 +190,35 @@ public class PokerEquityGUI extends JFrame {
             btn.addActionListener(e -> actions[idx].run());
             buttonPanel.add(btn);
         }
+        
+     // === BOTÓN NUEVO: Comprobar rango ===
+        JButton btnComprobar = createStyledButton("Comprobar rango");
+        btnComprobar.addActionListener(e -> {
+            String rango = JOptionPane.showInputDialog(this,
+                    "Introduce un rango (por ejemplo: AA,KK,AKs):",
+                    "Comprobar rango", JOptionPane.PLAIN_MESSAGE);
+
+            if (rango != null && !rango.isEmpty()) {
+                try {
+                    // Aquí he creado la clase RangeParser para que funcione
+                    List<String> manos = RangeParser.parse(rango);
+
+                    JOptionPane.showMessageDialog(this,
+                            "Rango introducido:\n" + manos,
+                            "Resultado del RangeParser",
+                            JOptionPane.INFORMATION_MESSAGE);
+
+                    System.out.println("Rango introducido: " + manos);
+
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(this,
+                            "Error al analizar el rango: " + ex.getMessage(),
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        });
+        buttonPanel.add(btnComprobar);
+
 
         panel.add(buttonPanel, BorderLayout.EAST);
         return panel;
