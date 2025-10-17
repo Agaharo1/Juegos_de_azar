@@ -1,21 +1,48 @@
-﻿# Eclipse / Java
-/bin/
-/target/
-/out/
-/*.class
-*.log
+﻿# ==========================================
+# 🧠 Proyecto: Juegos de Azar (Java / Eclipse)
+# ==========================================
+# Ignora archivos y carpetas temporales de todas las prácticas
+# (Practica1, Practica2, etc.)
 
-# IDE configs
-/.classpath
-/.project
-/.settings/
-/.idea/
-/.vscode/
-/*.iml
+# 🧱 Archivos de Eclipse / IDEs
+.project
+.classpath
+.settings/
+.idea/
+.vscode/
+*.iml
 
-# Sistema
+# 🏗️ Carpetas de compilación
+bin/
+out/
+target/
+build/
+
+# ⚙️ Archivos del sistema
 .DS_Store
 Thumbs.db
 
-# Otros
-*.jar
+# 🔒 Archivos temporales y de logs
+*.log
+*.tmp
+*.bak
+
+# 🚫 Archivos personales o de backup
+*.swp
+*~
+*.orig
+*.rej
+
+# 📦 Librerías externas (si las hubiera)
+lib/
+
+# 🖼️ Recursos: mantener solo las imágenes de cartas
+# Ignora todo dentro de /resources excepto /cartas y sus .png
+resources/*
+!resources/cartas/
+!resources/cartas/*.png
+
+# ==========================================
+# Fin del archivo .gitignore
+# ==========================================
+
