@@ -6,9 +6,11 @@ import java.awt.*;
 import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
-import tp2.logic.RangeParser; //Añadido por ahora para que funcione el RRangeParser, no se si está bien
-
+import tp2.logic.Deck;
+import tp2.logic.RangeParser;
+import tp2.logic.EquityCalculator;
 
 public class PokerEquityGUI extends JFrame {
     private JPanel mainPanel;
@@ -18,7 +20,13 @@ public class PokerEquityGUI extends JFrame {
     private List<PlayerPanel> playerPanels;
 
     private String[] boardCards = {"", "", "", "", ""};
-    private int boardPhase = 0; // 0=Preflop, 1=Flop, 2=Turn, 3=River
+    private Phase phase = Phase.PREFLOP;
+
+    private Deck deck; // baraja de la mano actual
+    private final EquityCalculator equityCalculator = new EquityCalculator();
+
+    // Botones
+    private JButton btnDeal, btnFlop, btnTurn, btnRiver, btnReset, btnComprobar;
 
     public PokerEquityGUI() {
         setTitle("Poker Equity Calculator");
@@ -26,7 +34,7 @@ public class PokerEquityGUI extends JFrame {
         setSize(1600, 900);
         setLocationRelativeTo(null);
         setResizable(true);
-        setBackground(new Color(20, 30, 45));
+        setBackground(UiTheme.BG_DARK);
 
         initializeComponents();
         setVisible(true);
@@ -35,7 +43,7 @@ public class PokerEquityGUI extends JFrame {
     private void initializeComponents() {
         mainPanel = new JPanel(new BorderLayout(10, 10));
         mainPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
-        mainPanel.setBackground(new Color(20, 30, 45));
+        mainPanel.setBackground(UiTheme.BG_DARK);
 
         tablePanel = createTablePanel();
         mainPanel.add(tablePanel, BorderLayout.CENTER);
@@ -59,27 +67,24 @@ public class PokerEquityGUI extends JFrame {
                 int centerX = w / 2;
                 int centerY = h / 2;
 
-                // Dibujar mesa de poker
+                // Mesa
                 int ellipseW = (int)(w * 0.7);
                 int ellipseH = (int)(h * 0.6);
-                g2.setColor(new Color(34, 60, 85));
+                g2.setColor(UiTheme.BG_CARD);
                 g2.fillOval(centerX - ellipseW / 2, centerY - ellipseH / 2, ellipseW, ellipseH);
-                g2.setColor(new Color(100, 130, 160));
+                g2.setColor(UiTheme.TABLE_STROKE);
                 g2.setStroke(new BasicStroke(3));
                 g2.drawOval(centerX - ellipseW / 2, centerY - ellipseH / 2, ellipseW, ellipseH);
 
-                // Dibujar cartas del board
-                int show = switch (boardPhase) {
-                    case 1 -> 3;
-                    case 2 -> 4;
-                    case 3 -> 5;
-                    default -> 0;
+                // Cuántas cartas enseñar según la fase
+                int show = switch (phase) {
+                    case FLOP  -> 3;
+                    case TURN  -> 4;
+                    case RIVER -> 5;
+                    default    -> 0;
                 };
-                
-                int cardW = 95;
-                int cardH = 140;
-                int spacing = 30;
-                
+
+                int cardW = 95, cardH = 140, spacing = 30;
                 int totalWidth = show * cardW + (show - 1) * spacing;
                 int startX = centerX - totalWidth / 2;
                 int y = centerY - cardH / 2;
@@ -90,73 +95,60 @@ public class PokerEquityGUI extends JFrame {
             }
         };
         panel.setLayout(null);
-        panel.setBackground(new Color(20, 30, 45));
-        
+        panel.setBackground(UiTheme.BG_DARK);
+
         createPlayerPanels(panel);
         return panel;
     }
 
     private void drawCard(Graphics2D g, int x, int y, String code, int w, int h) {
+        // sombra + base carta
         g.setColor(new Color(50, 50, 50));
         g.fillRect(x + 2, y + 2, w, h);
         g.setColor(new Color(240, 240, 240));
         g.fillRect(x, y, w, h);
         g.setColor(new Color(100, 100, 100));
         g.drawRect(x, y, w, h);
+
         if (!code.isEmpty()) {
-            Image img = loadCardImage(code);
+            Image img = CardImages.get(code); // caché
             if (img != null) g.drawImage(img, x, y, w, h, this);
         }
     }
 
-    private Image loadCardImage(String code){
-        String path = "/cartas/" + code + ".png";
-        java.net.URL url = getClass().getResource(path);
-        System.out.println("DEBUG URL=" + url);
-        if (url == null) return null;
-        return new ImageIcon(url).getImage();
-    }
-
-
     private void createPlayerPanels(JPanel tablePanel) {
-        tablePanel.addComponentListener(new java.awt.event.ComponentAdapter() {
+        tablePanel.addComponentListener(new ComponentAdapter() {
             @Override
-            public void componentResized(java.awt.event.ComponentEvent e) {
+            public void componentResized(ComponentEvent e) {
                 positionPlayers();
             }
         });
-        
+
         playerPanels = new ArrayList<>();
         String[] names = {"Player 1", "Player 2", "Player 3", "Player 4", "Player 5", "Player 6"};
         for (int i = 0; i < 6; i++) {
-            PlayerPanel pp = new PlayerPanel(names[i], i == 4);
+            PlayerPanel pp = new PlayerPanel(names[i], i == 4); // el 5º es el héroe
             playerPanels.add(pp);
             tablePanel.add(pp);
         }
     }
 
+    // Distribución uniforme por ángulo
     private void positionPlayers() {
-        int w = tablePanel.getWidth();
-        int h = tablePanel.getHeight();
+        int w = tablePanel.getWidth(), h = tablePanel.getHeight();
         if (w == 0 || h == 0) return;
 
-        int centerX = w / 2;
-        int centerY = h / 2;
-        int radiusX = (int)(w * 0.40);
-        int radiusY = (int)(h * 0.35);
+        int centerX = w / 2, centerY = h / 2;
+        int rx = (int)(w * 0.40), ry = (int)(h * 0.35);
 
-        int panelW = 160;
-        int panelH = 200;
-
-        double[] angles = {
-            Math.PI * 1.33, Math.PI * 1.65, Math.PI * -1.0,
-            Math.PI * -1.65, Math.PI * 0.0, Math.PI * -1.33
-        };
+        int panelW = 160, panelH = 200;
+        double offset = Math.PI * 0.5; // gira la distribución (empieza arriba)
 
         for (int i = 0; i < playerPanels.size(); i++) {
-            int x = (int)(centerX + radiusX * Math.cos(angles[i]));
-            int y = (int)(centerY + radiusY * Math.sin(angles[i]));
-            playerPanels.get(i).setBounds(x - panelW / 2, y - panelH / 2, panelW, panelH);
+            double ang = offset + (2 * Math.PI * i / playerPanels.size());
+            int x = (int)(centerX + rx * Math.cos(ang)) - panelW / 2;
+            int y = (int)(centerY + ry * Math.sin(ang)) - panelH / 2;
+            playerPanels.get(i).setBounds(x, y, panelW, panelH);
         }
     }
 
@@ -164,71 +156,79 @@ public class PokerEquityGUI extends JFrame {
         JPanel panel = new JPanel();
         panel.setLayout(new BorderLayout(15, 10));
         panel.setBorder(new CompoundBorder(
-            BorderFactory.createLineBorder(new Color(100, 116, 139), 2),
+            BorderFactory.createLineBorder(UiTheme.BORDER, 2),
             new EmptyBorder(15, 15, 15, 15)
         ));
-        panel.setBackground(new Color(30, 40, 55));
+        panel.setBackground(UiTheme.BG_PANEL);
 
         JPanel heroControlPanel = new HeroPanel();
         panel.add(heroControlPanel, BorderLayout.CENTER);
 
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
-        buttonPanel.setBackground(new Color(30, 40, 55));
+        buttonPanel.setBackground(UiTheme.BG_PANEL);
 
-        String[] btnLabels = {"Deal", "Flop", "Turn", "River", "Reset"};
-        Runnable[] actions = {
-            this::repartirCartas,
-            this::mostrarFlop,
-            this::mostrarTurn,
-            this::mostrarRiver,
-            this::reset
-        };
+        // Botones (referencias guardadas)
+        btnDeal  = createStyledButton("Deal");
+        btnFlop  = createStyledButton("Flop");
+        btnTurn  = createStyledButton("Turn");
+        btnRiver = createStyledButton("River");
+        btnReset = createStyledButton("Reset");
+        btnComprobar = createStyledButton("Comprobar rango");
 
-        for (int i = 0; i < btnLabels.length; i++) {
-            JButton btn = createStyledButton(btnLabels[i]);
-            final int idx = i;
-            btn.addActionListener(e -> actions[idx].run());
-            buttonPanel.add(btn);
-        }
-        
-     // === BOTÓN NUEVO: Comprobar rango ===
-        JButton btnComprobar = createStyledButton("Comprobar rango");
-        btnComprobar.addActionListener(e -> {
-            String rango = JOptionPane.showInputDialog(this,
-                    "Introduce un rango (por ejemplo: AA,KK,AKs):",
-                    "Comprobar rango", JOptionPane.PLAIN_MESSAGE);
+        btnDeal.addActionListener(e -> repartirCartas());
+        btnFlop.addActionListener(e -> mostrarFlop());
+        btnTurn.addActionListener(e -> mostrarTurn());
+        btnRiver.addActionListener(e -> mostrarRiver());
+        btnReset.addActionListener(e -> reset());
+        btnComprobar.addActionListener(e -> onComprobarRango());
 
-            if (rango != null && !rango.isEmpty()) {
-                try {
-                    // Aquí he creado la clase RangeParser para que funcione
-                    List<String> manos = RangeParser.parse(rango);
-
-                    JOptionPane.showMessageDialog(this,
-                            "Rango introducido:\n" + manos,
-                            "Resultado del RangeParser",
-                            JOptionPane.INFORMATION_MESSAGE);
-
-                    System.out.println("Rango introducido: " + manos);
-
-                } catch (Exception ex) {
-                    JOptionPane.showMessageDialog(this,
-                            "Error al analizar el rango: " + ex.getMessage(),
-                            "Error", JOptionPane.ERROR_MESSAGE);
-                }
-            }
-        });
+        buttonPanel.add(btnDeal);
+        buttonPanel.add(btnFlop);
+        buttonPanel.add(btnTurn);
+        buttonPanel.add(btnRiver);
+        buttonPanel.add(btnReset);
         buttonPanel.add(btnComprobar);
 
+        // Estado inicial de botones
+        updateButtonsState();
 
         panel.add(buttonPanel, BorderLayout.EAST);
         return panel;
     }
 
+    // Mostrar diálogo y usar RangeParser con validación
+    private void onComprobarRango() {
+        String rango = JOptionPane.showInputDialog(this,
+                "Introduce un rango (por ejemplo: AA,KK,AKs,AQo):",
+                "Comprobar rango", JOptionPane.PLAIN_MESSAGE);
+
+        if (rango != null && !rango.isEmpty()) {
+            if (!RangeParser.isBasicFormat(rango)) {
+                JOptionPane.showMessageDialog(this,
+                        "Formato no válido. Ej: AA,KK,AKs,AQo",
+                        "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            try {
+                List<String> manos = RangeParser.parse(rango);
+                JOptionPane.showMessageDialog(this,
+                        "Rango introducido:\n" + manos,
+                        "Resultado del RangeParser",
+                        JOptionPane.INFORMATION_MESSAGE);
+                System.out.println("Rango introducido: " + manos);
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this,
+                        "Error al analizar el rango: " + ex.getMessage(),
+                        "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
     private JButton createStyledButton(String text) {
         JButton btn = new JButton(text);
-        btn.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        btn.setFont(UiTheme.F_13B);
         btn.setPreferredSize(new Dimension(100, 40));
-        btn.setBackground(new Color(59, 130, 246));
+        btn.setBackground(UiTheme.ACCENT_PRIMARY);
         btn.setForeground(Color.WHITE);
         btn.setFocusPainted(false);
         btn.setBorderPainted(false);
@@ -236,107 +236,115 @@ public class PokerEquityGUI extends JFrame {
 
         btn.addMouseListener(new MouseAdapter() {
             @Override
-            public void mouseEntered(MouseEvent e) { btn.setBackground(new Color(37, 99, 235)); }
+            public void mouseEntered(MouseEvent e) { btn.setBackground(UiTheme.ACCENT_PRIMARY_HOV); }
             @Override
-            public void mouseExited(MouseEvent e) { btn.setBackground(new Color(59, 130, 246)); }
+            public void mouseExited(MouseEvent e)  { btn.setBackground(UiTheme.ACCENT_PRIMARY); }
         });
 
         return btn;
     }
 
+    /* ======================
+       LÓGICA CON DECK + PHASE + EQUITY
+       ====================== */
+
     private void repartirCartas() {
-        List<String> usedCards = new ArrayList<>();
+        deck = new Deck(); // baraja nueva y mezclada
+
         for (PlayerPanel pp : playerPanels) {
-            String card1, card2;
-            do { card1 = generateRandomCard(); } while (usedCards.contains(card1));
-            usedCards.add(card1);
-
-            do { card2 = generateRandomCard(); } while (usedCards.contains(card2));
-            usedCards.add(card2);
-
-            pp.setCards(card1 + card2);
+            String c1 = deck.draw();
+            String c2 = deck.draw();
+            pp.setCards(c1 + c2);
         }
         boardCards = new String[]{"", "", "", "", ""};
-        boardPhase = 0;
+        phase = Phase.PREFLOP; // al empezar la mano
         tablePanel.repaint();
-    }
 
-    private String generateRandomCard() {
-        String[] ranks = {"A","K","Q","J","T","9","8","7","6","5","4","3","2"};
-        String[] suits = {"h","d","c","s"};
-        return ranks[(int)(Math.random()*ranks.length)] + suits[(int)(Math.random()*suits.length)];
+        updateButtonsState();
+        updateEquities(); // recalcular con nuevas hole cards (board vacío)
     }
 
     private void mostrarFlop() {
-        if (boardPhase == 0) {
-            List<String> usedCards = getAllUsedCards();
-            
-            for (int i = 0; i < 3; i++) {
-                String card;
-                do {
-                    card = generateRandomCard();
-                } while (usedCards.contains(card));
-                usedCards.add(card);
-                boardCards[i] = card;
-            }
-            boardPhase = 1;
+        if (deck == null) return;
+        if (phase == Phase.PREFLOP) {
+            boardCards[0] = deck.draw();
+            boardCards[1] = deck.draw();
+            boardCards[2] = deck.draw();
+            phase = Phase.FLOP;
             tablePanel.repaint();
+            updateButtonsState();
+            updateEquities();
         }
     }
 
     private void mostrarTurn() {
-        if (boardPhase == 1) {
-            List<String> usedCards = getAllUsedCards();
-            
-            String card;
-            do {
-                card = generateRandomCard();
-            } while (usedCards.contains(card));
-            boardCards[3] = card;
-            boardPhase = 2;
+        if (deck == null) return;
+        if (phase == Phase.FLOP) {
+            boardCards[3] = deck.draw();
+            phase = Phase.TURN;
             tablePanel.repaint();
+            updateButtonsState();
+            updateEquities();
         }
     }
 
     private void mostrarRiver() {
-        if (boardPhase == 2) {
-            List<String> usedCards = getAllUsedCards();
-            
-            String card;
-            do {
-                card = generateRandomCard();
-            } while (usedCards.contains(card));
-            boardCards[4] = card;
-            boardPhase = 3;
+        if (deck == null) return;
+        if (phase == Phase.TURN) {
+            boardCards[4] = deck.draw();
+            phase = Phase.RIVER;
             tablePanel.repaint();
+            updateButtonsState();
+            updateEquities();
         }
-    }
-
-    private List<String> getAllUsedCards() {
-        List<String> usedCards = new ArrayList<>();
-        
-        for (PlayerPanel pp : playerPanels) {
-            String cards = pp.getCards();
-            if (cards.length() >= 4) {
-                usedCards.add(cards.substring(0, 2));
-                usedCards.add(cards.substring(2, 4));
-            }
-        }
-        
-        for (String boardCard : boardCards) {
-            if (!boardCard.isEmpty()) {
-                usedCards.add(boardCard);
-            }
-        }
-        
-        return usedCards;
     }
 
     private void reset() {
-        boardPhase = 0;
+        phase = Phase.PREFLOP;
+        deck = null; // descartar baraja actual
         boardCards = new String[]{"", "", "", "", ""};
         tablePanel.repaint();
         for (PlayerPanel pp : playerPanels) pp.reset();
+
+        updateButtonsState();
+    }
+
+    // Habilita/inhabilita según fase (y si hay baraja)
+    private void updateButtonsState() {
+        if (btnDeal != null)  btnDeal.setEnabled(true);
+        if (btnReset != null) btnReset.setEnabled(true);
+
+        boolean hasDeck = (deck != null);
+
+        if (btnFlop != null)  btnFlop.setEnabled(hasDeck && phase == Phase.PREFLOP);
+        if (btnTurn != null)  btnTurn.setEnabled(hasDeck && phase == Phase.FLOP);
+        if (btnRiver != null) btnRiver.setEnabled(hasDeck && phase == Phase.TURN);
+    }
+
+    // ========== NUEVO: Cálculo y refresco de equities ==========
+    private void updateEquities() {
+        // Lista de jugadores (por nombre) en el mismo orden que playerPanels
+        List<String> jugadores = new ArrayList<>();
+        for (PlayerPanel pp : playerPanels) {
+            jugadores.add(pp.getPlayerName());
+        }
+
+        // Board visible actual como lista (solo posiciones no vacías)
+        List<String> board = new ArrayList<>();
+        for (String bc : boardCards) {
+            if (bc != null && !bc.isEmpty()) board.add(bc);
+        }
+
+        // Calcular
+        Map<String, Double> equities = equityCalculator.calcularEquity(jugadores, board);
+
+        // Asignar a cada panel por orden
+        for (int i = 0; i < playerPanels.size(); i++) {
+            PlayerPanel pp = playerPanels.get(i);
+            String name = jugadores.get(i);
+            Double eq = equities.getOrDefault(name, 0.0);
+            pp.setEquity(eq);
+        }
     }
 
     public static void main(String[] args) {

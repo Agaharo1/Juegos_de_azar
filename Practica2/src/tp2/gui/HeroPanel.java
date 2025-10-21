@@ -15,13 +15,15 @@ public class HeroPanel extends JPanel {
 
     public HeroPanel() {
         initializeComponents();
+        updateRangeFields(); // asegura enabled/disabled correcto al iniciar
     }
+
 
     private void initializeComponents() {
         setLayout(new BoxLayout(this, BoxLayout.X_AXIS));
-        setBackground(new Color(30,40,55));
+        setBackground(UiTheme.BG_PANEL);
         setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(75,85,99),1),
+                BorderFactory.createLineBorder(UiTheme.BORDER,1),
                 new EmptyBorder(8,10,8,10)
         ));
 
@@ -40,24 +42,24 @@ public class HeroPanel extends JPanel {
     private JPanel createRangeTypePanel() {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBackground(new Color(30,40,55));
+        panel.setBackground(UiTheme.BG_PANEL);
 
         JLabel typeLabel = new JLabel("Range Type");
-        typeLabel.setFont(new Font("Segoe UI", Font.BOLD,10));
-        typeLabel.setForeground(new Color(180,180,180));
+        typeLabel.setFont(UiTheme.F_10B);
+        typeLabel.setForeground(UiTheme.FG_TEXT_DIM);
         panel.add(typeLabel);
 
         ButtonGroup bg = new ButtonGroup();
         rbTextualRange = new JRadioButton("Textual",true);
         rbPercentageRange = new JRadioButton("Percentage",false);
-        styleRadioButton(rbTextualRange); 
+        styleRadioButton(rbTextualRange);
         styleRadioButton(rbPercentageRange);
-        bg.add(rbTextualRange); 
+        bg.add(rbTextualRange);
         bg.add(rbPercentageRange);
         rbTextualRange.addActionListener(e->updateRangeFields());
         rbPercentageRange.addActionListener(e->updateRangeFields());
 
-        panel.add(rbTextualRange); 
+        panel.add(rbTextualRange);
         panel.add(rbPercentageRange);
         return panel;
     }
@@ -65,10 +67,10 @@ public class HeroPanel extends JPanel {
     private JPanel createTextualPanel() {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBackground(new Color(30,40,55));
+        panel.setBackground(UiTheme.BG_PANEL);
         JLabel rangeLabel = new JLabel("Textual Range:");
-        rangeLabel.setFont(new Font("Segoe UI",Font.PLAIN,9));
-        rangeLabel.setForeground(new Color(180,180,180));
+        rangeLabel.setFont(UiTheme.F_9);
+        rangeLabel.setForeground(UiTheme.FG_TEXT_DIM);
         panel.add(rangeLabel);
         textualRangeField = createTextField("AA,KK,QQ,JJ",140);
         panel.add(textualRangeField);
@@ -78,17 +80,17 @@ public class HeroPanel extends JPanel {
     private JPanel createRankingPanel() {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBackground(new Color(30,40,55));
+        panel.setBackground(UiTheme.BG_PANEL);
         JLabel rankingLabel = new JLabel("Ranking:");
-        rankingLabel.setFont(new Font("Segoe UI",Font.PLAIN,9));
-        rankingLabel.setForeground(new Color(180,180,180));
+        rankingLabel.setFont(UiTheme.F_9);
+        rankingLabel.setForeground(UiTheme.FG_TEXT_DIM);
         panel.add(rankingLabel);
         rankingCombo = new JComboBox<>(new String[]{"Sklansky-Chubukov","Custom"});
         rankingCombo.setMaximumSize(new Dimension(150,25));
         rankingCombo.setEnabled(false);
-        rankingCombo.setFont(new Font("Segoe UI",Font.PLAIN,9));
-        rankingCombo.setBackground(new Color(50,60,80));
-        rankingCombo.setForeground(new Color(220,220,220));
+        rankingCombo.setFont(UiTheme.F_9);
+        rankingCombo.setBackground(UiTheme.BG_INPUT);
+        rankingCombo.setForeground(UiTheme.FG_TEXT);
         panel.add(rankingCombo);
         return panel;
     }
@@ -96,17 +98,17 @@ public class HeroPanel extends JPanel {
     private JPanel createPercentagePanel() {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBackground(new Color(30,40,55));
+        panel.setBackground(UiTheme.BG_PANEL);
         JLabel percentageLabel = new JLabel("Percentage:");
-        percentageLabel.setFont(new Font("Segoe UI",Font.PLAIN,9));
-        percentageLabel.setForeground(new Color(180,180,180));
+        percentageLabel.setFont(UiTheme.F_9);
+        percentageLabel.setForeground(UiTheme.FG_TEXT_DIM);
         panel.add(percentageLabel);
         percentageSpinner = new JSpinner(new SpinnerNumberModel(25,1,100,1));
         percentageSpinner.setMaximumSize(new Dimension(90,25));
         percentageSpinner.setEnabled(false);
-        ((JSpinner.DefaultEditor)percentageSpinner.getEditor()).getTextField().setFont(new Font("Segoe UI",Font.PLAIN,9));
-        ((JSpinner.DefaultEditor)percentageSpinner.getEditor()).getTextField().setBackground(new Color(50,60,80));
-        ((JSpinner.DefaultEditor)percentageSpinner.getEditor()).getTextField().setForeground(new Color(220,220,220));
+        ((JSpinner.DefaultEditor)percentageSpinner.getEditor()).getTextField().setFont(UiTheme.F_9);
+        ((JSpinner.DefaultEditor)percentageSpinner.getEditor()).getTextField().setBackground(UiTheme.BG_INPUT);
+        ((JSpinner.DefaultEditor)percentageSpinner.getEditor()).getTextField().setForeground(UiTheme.FG_TEXT);
         panel.add(percentageSpinner);
         return panel;
     }
@@ -114,41 +116,41 @@ public class HeroPanel extends JPanel {
     private JPanel createCheckPanel() {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBackground(new Color(30,40,55));
-        cbRandomCards = new JCheckBox("Random Cards"); 
-        cbRandomCards.setSelected(true); 
+        panel.setBackground(UiTheme.BG_PANEL);
+        cbRandomCards = new JCheckBox("Random Cards");
+        cbRandomCards.setSelected(true);
         styleCheckBox(cbRandomCards);
-        cbRandomBoard = new JCheckBox("Random Board"); 
-        cbRandomBoard.setSelected(true); 
+        cbRandomBoard = new JCheckBox("Random Board");
+        cbRandomBoard.setSelected(true);
         styleCheckBox(cbRandomBoard);
-        panel.add(cbRandomCards); 
+        panel.add(cbRandomCards);
         panel.add(cbRandomBoard);
         return panel;
     }
 
     private void styleRadioButton(JRadioButton rb) {
-        rb.setFont(new Font("Segoe UI",Font.PLAIN,9));
-        rb.setBackground(new Color(30,40,55));
-        rb.setForeground(new Color(220,220,220));
+        rb.setFont(UiTheme.F_9);
+        rb.setBackground(UiTheme.BG_PANEL);
+        rb.setForeground(UiTheme.FG_TEXT);
     }
-    
+
     private void styleCheckBox(JCheckBox cb){
-        cb.setFont(new Font("Segoe UI",Font.PLAIN,9));
-        cb.setBackground(new Color(30,40,55));
-        cb.setForeground(new Color(220,220,220));
+        cb.setFont(UiTheme.F_9);
+        cb.setBackground(UiTheme.BG_PANEL);
+        cb.setForeground(UiTheme.FG_TEXT);
     }
-    
+
     private JTextField createTextField(String text,int width){
         JTextField field = new JTextField(text);
         field.setMaximumSize(new Dimension(width,25));
-        field.setFont(new Font("Segoe UI",Font.PLAIN,9));
-        field.setBackground(new Color(50,60,80));
-        field.setForeground(new Color(220,220,220));
-        field.setBorder(BorderFactory.createLineBorder(new Color(75,85,99),1));
-        field.setCaretColor(new Color(150,150,150));
+        field.setFont(UiTheme.F_9);
+        field.setBackground(UiTheme.BG_INPUT);
+        field.setForeground(UiTheme.FG_TEXT);
+        field.setBorder(BorderFactory.createLineBorder(UiTheme.BORDER,1));
+        field.setCaretColor(new Color(150,150,150)); // este puede quedarse literal
         return field;
     }
-    
+
     private void updateRangeFields(){
         textualRangeField.setEnabled(rbTextualRange.isSelected());
         rankingCombo.setEnabled(rbPercentageRange.isSelected());

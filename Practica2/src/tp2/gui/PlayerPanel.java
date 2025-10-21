@@ -3,7 +3,7 @@ package tp2.gui;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.awt.event.*;
+import java.util.Locale;
 
 public class PlayerPanel extends JPanel {
     private final String playerName;
@@ -20,9 +20,9 @@ public class PlayerPanel extends JPanel {
 
     private void initializeComponents() {
         setLayout(new BorderLayout(2, 2));
-        setBackground(new Color(40, 50, 65));
+        setBackground(UiTheme.BG_CARD);
         setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(isHero ? new Color(100, 200, 255) : new Color(75, 85, 99), 3),
+                BorderFactory.createLineBorder(isHero ? UiTheme.HERO_BORDER : UiTheme.BORDER, 3),
                 new EmptyBorder(5, 5, 5, 5)
         ));
 
@@ -30,8 +30,8 @@ public class PlayerPanel extends JPanel {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 2, 0));
         topPanel.setBackground(getBackground());
         JLabel nameLabel = new JLabel(isHero ? playerName + " (YOU)" : playerName);
-        nameLabel.setFont(new Font("Segoe UI", isHero ? Font.BOLD : Font.PLAIN, 10));
-        nameLabel.setForeground(isHero ? new Color(100, 200, 255) : new Color(200, 200, 200));
+        nameLabel.setFont(isHero ? UiTheme.F_10B : UiTheme.F_10);
+        nameLabel.setForeground(isHero ? UiTheme.HERO_BORDER : UiTheme.FG_TEXT);
         topPanel.add(nameLabel);
         add(topPanel, BorderLayout.NORTH);
 
@@ -41,7 +41,7 @@ public class PlayerPanel extends JPanel {
 
         // Panel inferior: Equity
         JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
-        bottomPanel.setBackground(new Color(34, 60, 85));
+        bottomPanel.setBackground(UiTheme.BG_CARD);
         bottomPanel.setBorder(BorderFactory.createEmptyBorder(5,5,5,5));
 
         JPanel equityPanel = new JPanel() {
@@ -50,9 +50,9 @@ public class PlayerPanel extends JPanel {
                 super.paintComponent(g);
                 Graphics2D g2 = (Graphics2D) g;
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(new Color(34, 150, 255));
+                g2.setColor(UiTheme.CHIP_FILL);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 20, 20);
-                g2.setColor(new Color(20, 100, 200));
+                g2.setColor(UiTheme.CHIP_STROK);
                 g2.setStroke(new BasicStroke(2));
                 g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 20, 20);
             }
@@ -63,7 +63,7 @@ public class PlayerPanel extends JPanel {
 
         equityField = new JLabel("0.0%", JLabel.CENTER);
         equityField.setForeground(Color.WHITE);
-        equityField.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        equityField.setFont(UiTheme.F_18B);
         equityField.setOpaque(false);
 
         equityPanel.add(equityField, BorderLayout.CENTER);
@@ -81,6 +81,16 @@ public class PlayerPanel extends JPanel {
         return cards;
     }
 
+    /** NUEVO: establece el texto de equity con 1 decimal (e.g., 31.4%) */
+    public void setEquity(double pct) {
+        equityField.setText(String.format(Locale.ROOT, "%.1f%%", pct));
+    }
+
+    /** NUEVO: expone el nombre para el calculador */
+    public String getPlayerName() {
+        return playerName;
+    }
+
     public void reset() {
         cards = "";
         cardsPanel.setCards("");
@@ -93,7 +103,7 @@ public class PlayerPanel extends JPanel {
 
         public void setCards(String cards) {
             this.cards = cards;
-            setBackground(new Color(34,60,85));
+            setBackground(UiTheme.BG_CARD);
             repaint();
         }
 
@@ -107,8 +117,8 @@ public class PlayerPanel extends JPanel {
                 String card1 = cards.substring(0, 2);
                 String card2 = cards.substring(2, 4);
 
-                Image img1 = loadCardImage(card1);
-                Image img2 = loadCardImage(card2);
+                Image img1 = CardImages.get(card1); // caché
+                Image img2 = CardImages.get(card2); // caché
 
                 int w = (int) (getWidth() * 0.45);
                 int h = (int) (getHeight() * 0.85);
@@ -118,15 +128,6 @@ public class PlayerPanel extends JPanel {
                 if (img1 != null) g2.drawImage(img1, 5, y, w, h, this);
                 if (img2 != null) g2.drawImage(img2, 5 + overlap, y, w, h, this);
             }
-        }
-
-
-        private Image loadCardImage(String code){
-            String path = "/cartas/" + code + ".png";
-            java.net.URL url = getClass().getResource(path);
-            System.out.println("DEBUG URL=" + url);
-            if (url == null) return null;
-            return new ImageIcon(url).getImage();
         }
     }
 }
