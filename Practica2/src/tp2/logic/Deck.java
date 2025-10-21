@@ -1,6 +1,7 @@
 package tp2.logic;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
@@ -25,6 +26,17 @@ public class Deck {
             throw new IllegalStateException("Deck is empty");
         }
         return cards.get(index++);
+    }
+
+    /** Elimina del mazo todas las 'codes' evitando conflictos con cartas ya usadas. */
+    public void removeCards(Collection<String> codes) {
+        if (codes == null || codes.isEmpty()) return;
+        // Conserva solo el tramo aún no robado, filtra y reinicia índice.
+        List<String> remaining = new ArrayList<>(cards.subList(index, cards.size()));
+        remaining.removeIf(codes::contains);
+        cards.clear();
+        cards.addAll(remaining);
+        index = 0;
     }
 
     public int remaining() {

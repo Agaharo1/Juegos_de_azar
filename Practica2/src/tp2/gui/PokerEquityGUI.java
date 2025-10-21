@@ -4,13 +4,15 @@ import javax.swing.*;
 import javax.swing.border.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.util.ArrayList;
+import java.util.*;
 import java.util.List;
 import java.util.Map;
 
 import tp2.logic.Deck;
 import tp2.logic.RangeParser;
 import tp2.logic.EquityCalculator;
+import tp2.model.GameState;
+import tp2.model.Hand;
 
 public class PokerEquityGUI extends JFrame {
     private JPanel mainPanel;
@@ -19,11 +21,13 @@ public class PokerEquityGUI extends JFrame {
 
     private List<PlayerPanel> playerPanels;
 
-    private String[] boardCards = {"", "", "", "", ""};
     private Phase phase = Phase.PREFLOP;
 
     private Deck deck; // baraja de la mano actual
     private final EquityCalculator equityCalculator = new EquityCalculator();
+
+    // Modelo
+    private final GameState state = new GameState();
 
     // Botones
     private JButton btnDeal, btnFlop, btnTurn, btnRiver, btnReset, btnComprobar;
@@ -67,7 +71,6 @@ public class PokerEquityGUI extends JFrame {
                 int centerX = w / 2;
                 int centerY = h / 2;
 
-                // Mesa
                 int ellipseW = (int)(w * 0.7);
                 int ellipseH = (int)(h * 0.6);
                 g2.setColor(UiTheme.BG_CARD);
@@ -76,7 +79,6 @@ public class PokerEquityGUI extends JFrame {
                 g2.setStroke(new BasicStroke(3));
                 g2.drawOval(centerX - ellipseW / 2, centerY - ellipseH / 2, ellipseW, ellipseH);
 
-                // Cuántas cartas enseñar según la fase
                 int show = switch (phase) {
                     case FLOP  -> 3;
                     case TURN  -> 4;
@@ -89,8 +91,9 @@ public class PokerEquityGUI extends JFrame {
                 int startX = centerX - totalWidth / 2;
                 int y = centerY - cardH / 2;
 
+                String[] board = state.getBoard().raw();
                 for (int i = 0; i < show; i++) {
-                    drawCard(g2, startX + i * (cardW + spacing), y, boardCards[i], cardW, cardH);
+                    drawCard(g2, startX + i * (cardW + spacing), y, board[i], cardW, cardH);
                 }
             }
         };
@@ -102,7 +105,6 @@ public class PokerEquityGUI extends JFrame {
     }
 
     private void drawCard(Graphics2D g, int x, int y, String code, int w, int h) {
-        // sombra + base carta
         g.setColor(new Color(50, 50, 50));
         g.fillRect(x + 2, y + 2, w, h);
         g.setColor(new Color(240, 240, 240));
@@ -110,8 +112,8 @@ public class PokerEquityGUI extends JFrame {
         g.setColor(new Color(100, 100, 100));
         g.drawRect(x, y, w, h);
 
-        if (!code.isEmpty()) {
-            Image img = CardImages.get(code); // caché
+        if (code != null && !code.isEmpty()) {
+            Image img = CardImages.get(code);
             if (img != null) g.drawImage(img, x, y, w, h, this);
         }
     }
@@ -127,13 +129,12 @@ public class PokerEquityGUI extends JFrame {
         playerPanels = new ArrayList<>();
         String[] names = {"Player 1", "Player 2", "Player 3", "Player 4", "Player 5", "Player 6"};
         for (int i = 0; i < 6; i++) {
-            PlayerPanel pp = new PlayerPanel(names[i], i == 4); // el 5º es el héroe
+            PlayerPanel pp = new PlayerPanel(names[i], i == 4);
             playerPanels.add(pp);
             tablePanel.add(pp);
         }
     }
 
-    // Distribución uniforme por ángulo
     private void positionPlayers() {
         int w = tablePanel.getWidth(), h = tablePanel.getHeight();
         if (w == 0 || h == 0) return;
@@ -142,7 +143,7 @@ public class PokerEquityGUI extends JFrame {
         int rx = (int)(w * 0.40), ry = (int)(h * 0.35);
 
         int panelW = 160, panelH = 200;
-        double offset = Math.PI * 0.5; // gira la distribución (empieza arriba)
+        double offset = Math.PI * 0.5;
 
         for (int i = 0; i < playerPanels.size(); i++) {
             double ang = offset + (2 * Math.PI * i / playerPanels.size());
@@ -167,7 +168,6 @@ public class PokerEquityGUI extends JFrame {
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
         buttonPanel.setBackground(UiTheme.BG_PANEL);
 
-        // Botones (referencias guardadas)
         btnDeal  = createStyledButton("Deal");
         btnFlop  = createStyledButton("Flop");
         btnTurn  = createStyledButton("Turn");
@@ -189,14 +189,12 @@ public class PokerEquityGUI extends JFrame {
         buttonPanel.add(btnReset);
         buttonPanel.add(btnComprobar);
 
-        // Estado inicial de botones
         updateButtonsState();
 
         panel.add(buttonPanel, BorderLayout.EAST);
         return panel;
     }
 
-    // Mostrar diálogo y usar RangeParser con validación
     private void onComprobarRango() {
         String rango = JOptionPane.showInputDialog(this,
                 "Introduce un rango (por ejemplo: AA,KK,AKs,AQo):",
@@ -245,32 +243,45 @@ public class PokerEquityGUI extends JFrame {
     }
 
     /* ======================
-       LÓGICA CON DECK + PHASE + EQUITY
+       LÓGICA CON DECK + PHASE + EQUITY + GAMESTATE + VALIDACIÓN
        ====================== */
 
     private void repartirCartas() {
-        deck = new Deck(); // baraja nueva y mezclada
+        deck = new Deck();
+        state.reset();
 
-        for (PlayerPanel pp : playerPanels) {
-            String c1 = deck.draw();
-            String c2 = deck.draw();
+        // Si existieran cartas fijadas previamente, se purgarían aquí
+        deck.removeCards(state.allUsedCards());
+
+        for (int i = 0; i < playerPanels.size(); i++) {
+            PlayerPanel pp = playerPanels.get(i);
+            String c1 = drawUnique();
+            String c2 = drawUnique();
             pp.setCards(c1 + c2);
+            state.setPlayerHand(i, new Hand(c1, c2));
         }
-        boardCards = new String[]{"", "", "", "", ""};
-        phase = Phase.PREFLOP; // al empezar la mano
+
+        phase = Phase.PREFLOP;
+        state.setPhase(phase);
         tablePanel.repaint();
 
         updateButtonsState();
-        updateEquities(); // recalcular con nuevas hole cards (board vacío)
+        updateEquities();
     }
 
     private void mostrarFlop() {
         if (deck == null) return;
         if (phase == Phase.PREFLOP) {
-            boardCards[0] = deck.draw();
-            boardCards[1] = deck.draw();
-            boardCards[2] = deck.draw();
+            // Purga por si añadiste cartas manualmente al modelo antes del flop
+            deck.removeCards(state.allUsedCards());
+
+            String c1 = drawUnique();
+            String c2 = drawUnique();
+            String c3 = drawUnique();
+            state.getBoard().setFlop(c1, c2, c3);
+
             phase = Phase.FLOP;
+            state.setPhase(phase);
             tablePanel.repaint();
             updateButtonsState();
             updateEquities();
@@ -280,8 +291,13 @@ public class PokerEquityGUI extends JFrame {
     private void mostrarTurn() {
         if (deck == null) return;
         if (phase == Phase.FLOP) {
-            boardCards[3] = deck.draw();
+            deck.removeCards(state.allUsedCards());
+
+            String c4 = drawUnique();
+            state.getBoard().setTurn(c4);
+
             phase = Phase.TURN;
+            state.setPhase(phase);
             tablePanel.repaint();
             updateButtonsState();
             updateEquities();
@@ -291,8 +307,13 @@ public class PokerEquityGUI extends JFrame {
     private void mostrarRiver() {
         if (deck == null) return;
         if (phase == Phase.TURN) {
-            boardCards[4] = deck.draw();
+            deck.removeCards(state.allUsedCards());
+
+            String c5 = drawUnique();
+            state.getBoard().setRiver(c5);
+
             phase = Phase.RIVER;
+            state.setPhase(phase);
             tablePanel.repaint();
             updateButtonsState();
             updateEquities();
@@ -301,15 +322,15 @@ public class PokerEquityGUI extends JFrame {
 
     private void reset() {
         phase = Phase.PREFLOP;
-        deck = null; // descartar baraja actual
-        boardCards = new String[]{"", "", "", "", ""};
+        state.reset();
+        deck = null;
+
         tablePanel.repaint();
         for (PlayerPanel pp : playerPanels) pp.reset();
 
         updateButtonsState();
     }
 
-    // Habilita/inhabilita según fase (y si hay baraja)
     private void updateButtonsState() {
         if (btnDeal != null)  btnDeal.setEnabled(true);
         if (btnReset != null) btnReset.setEnabled(true);
@@ -321,30 +342,31 @@ public class PokerEquityGUI extends JFrame {
         if (btnRiver != null) btnRiver.setEnabled(hasDeck && phase == Phase.TURN);
     }
 
-    // ========== NUEVO: Cálculo y refresco de equities ==========
     private void updateEquities() {
-        // Lista de jugadores (por nombre) en el mismo orden que playerPanels
         List<String> jugadores = new ArrayList<>();
         for (PlayerPanel pp : playerPanels) {
             jugadores.add(pp.getPlayerName());
         }
-
-        // Board visible actual como lista (solo posiciones no vacías)
-        List<String> board = new ArrayList<>();
-        for (String bc : boardCards) {
-            if (bc != null && !bc.isEmpty()) board.add(bc);
-        }
-
-        // Calcular
+        List<String> board = state.getBoard().visible();
         Map<String, Double> equities = equityCalculator.calcularEquity(jugadores, board);
 
-        // Asignar a cada panel por orden
         for (int i = 0; i < playerPanels.size(); i++) {
             PlayerPanel pp = playerPanels.get(i);
             String name = jugadores.get(i);
             Double eq = equities.getOrDefault(name, 0.0);
             pp.setEquity(eq);
         }
+    }
+
+    /** Roba del mazo garantizando que no devuelva cartas ya usadas según GameState. */
+    private String drawUnique() {
+        Set<String> used = new HashSet<>(state.allUsedCards());
+        String c;
+        do {
+            c = deck.draw();
+            // Si por cualquier motivo ya se usó (p. ej., carta fijada manualmente), se “descarta” y se saca otra
+        } while (used.contains(c));
+        return c;
     }
 
     public static void main(String[] args) {
