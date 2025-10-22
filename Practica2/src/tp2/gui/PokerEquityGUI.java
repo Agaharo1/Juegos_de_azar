@@ -195,6 +195,9 @@ public class PokerEquityGUI extends JFrame {
         return panel;
     }
 
+    
+
+
     private void onComprobarRango() {
         String rango = JOptionPane.showInputDialog(this,
                 "Introduce un rango (por ejemplo: AA,KK,AKs,AQo):",
@@ -209,17 +212,73 @@ public class PokerEquityGUI extends JFrame {
             }
             try {
                 List<String> manos = RangeParser.parse(rango);
+                
+                Random rand = new Random();
+                String manoElegida = manos.get(rand.nextInt(manos.size()));
+                
+                String cartasConcretas = generarCartasConcretasDesdeNotacion(manoElegida);
+                
+                
+                PlayerPanel heroPanel = playerPanels.get(4);
+                heroPanel.setCards(cartasConcretas);
+                
+                
+                state.setPlayerHand(4, Hand.fromString(cartasConcretas));
+                
+                //para Recalcular equities
+                updateEquities();
+                
                 JOptionPane.showMessageDialog(this,
-                        "Rango introducido:\n" + manos,
-                        "Resultado del RangeParser",
+                        "Mano asignada al heroe: " + manoElegida + " (" + cartasConcretas + ")",
+                        "Rango aplicado",
                         JOptionPane.INFORMATION_MESSAGE);
-                System.out.println("Rango introducido: " + manos);
+                        
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(this,
                         "Error al analizar el rango: " + ex.getMessage(),
                         "Error", JOptionPane.ERROR_MESSAGE);
             }
         }
+    }
+
+
+
+    private String generarCartasConcretasDesdeNotacion(String notacion) {
+    	 String[] palos = {"h", "d", "c", "s"};
+    	    Random rand = new Random();
+    	    String notacionUpper = notacion.toUpperCase();
+    	    
+    	    // Expresion regular
+    	    String base = notacionUpper.replaceAll("[SO]$", "");
+    	    
+    	    if (base.length() != 2) {
+    	        throw new IllegalArgumentException("Notación inválida: " + notacion);
+    	    }
+    	    
+    	    char rank1 = base.charAt(0);
+    	    char rank2 = base.charAt(1);
+    	    
+    	    if (notacionUpper.endsWith("S")) { 
+    	        // Suited
+    	        String palo = palos[rand.nextInt(4)];
+    	        return "" + rank1 + palo + rank2 + palo;
+    	    } else if (notacionUpper.endsWith("O")) { 
+    	        // Offsuit
+    	        String palo1 = palos[rand.nextInt(4)];
+    	        String palo2;
+    	        do {
+    	            palo2 = palos[rand.nextInt(4)];
+    	        } while (palo1.equals(palo2));
+    	        return "" + rank1 + palo1 + rank2 + palo2;
+    	    } else {
+    	        // Par
+    	        String palo1 = palos[rand.nextInt(4)];
+    	        String palo2;
+    	        do {
+    	            palo2 = palos[rand.nextInt(4)];
+    	        } while (palo1.equals(palo2));
+    	        return "" + rank1 + palo1 + rank2 + palo2;
+    	    }
     }
 
     private JButton createStyledButton(String text) {
