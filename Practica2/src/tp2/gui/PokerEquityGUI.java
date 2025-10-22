@@ -201,26 +201,56 @@ public class PokerEquityGUI extends JFrame {
                 "Comprobar rango", JOptionPane.PLAIN_MESSAGE);
 
         if (rango != null && !rango.isEmpty()) {
-            if (!RangeParser.isBasicFormat(rango)) {
-                JOptionPane.showMessageDialog(this,
-                        "Formato no válido. Ej: AA,KK,AKs,AQo",
-                        "Error", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-            try {
-                List<String> manos = RangeParser.parse(rango);
-                JOptionPane.showMessageDialog(this,
-                        "Rango introducido:\n" + manos,
-                        "Resultado del RangeParser",
-                        JOptionPane.INFORMATION_MESSAGE);
-                System.out.println("Rango introducido: " + manos);
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this,
-                        "Error al analizar el rango: " + ex.getMessage(),
-                        "Error", JOptionPane.ERROR_MESSAGE);
-            }
+            calcularEquityDesdeRango(rango);
         }
     }
+
+    
+    /**
+     * Integra el RangeParser con el EquityCalculator.
+     * Por ahora calcula equities dummy usando las manos parseadas como "jugadores".
+     */
+    private void calcularEquityDesdeRango(String rango) {
+        if (!RangeParser.isBasicFormat(rango)) {
+            JOptionPane.showMessageDialog(this,
+                    "Formato no válido. Ejemplo: AA,KK,AKs,AQo",
+                    "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        try {
+            // 1️⃣ Parsear el rango
+            List<String> manos = RangeParser.parse(rango);
+
+            // 2️⃣ Crear una lista de jugadores "ficticios" usando cada mano del rango
+            List<String> jugadores = new ArrayList<>();
+            for (int i = 0; i < manos.size(); i++) {
+                jugadores.add("Combo " + (i + 1) + " (" + manos.get(i) + ")");
+            }
+
+            // 3️⃣ Obtener el board actual (si existe)
+            List<String> board = state.getBoard().visible();
+
+            // 4️⃣ Calcular equities
+            Map<String, Double> resultados = equityCalculator.calcularEquity(jugadores, board);
+
+            // 5️⃣ Mostrar resultados
+            StringBuilder sb = new StringBuilder("Resultados del cálculo de equity:\n\n");
+            for (Map.Entry<String, Double> e : resultados.entrySet()) {
+                sb.append(String.format("%-20s %.2f%%\n", e.getKey(), e.getValue()));
+            }
+
+            JOptionPane.showMessageDialog(this, sb.toString(),
+                    "Equity Calculator (Dummy)", JOptionPane.INFORMATION_MESSAGE);
+
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Error al procesar el rango: " + ex.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+
 
     private JButton createStyledButton(String text) {
         JButton btn = new JButton(text);
