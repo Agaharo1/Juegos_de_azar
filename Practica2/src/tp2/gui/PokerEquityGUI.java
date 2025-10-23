@@ -32,6 +32,9 @@ public class PokerEquityGUI extends JFrame {
     // Botones
     private JButton btnDeal, btnFlop, btnTurn, btnRiver, btnReset, btnComprobar;
 
+    // Controlador (único punto de entrada de eventos)
+    private final Controller controller = new Controller();
+
     public PokerEquityGUI() {
         setTitle("Poker Equity Calculator");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -175,12 +178,13 @@ public class PokerEquityGUI extends JFrame {
         btnReset = createStyledButton("Reset");
         btnComprobar = createStyledButton("Comprobar rango");
 
-        btnDeal.addActionListener(e -> repartirCartas());
-        btnFlop.addActionListener(e -> mostrarFlop());
-        btnTurn.addActionListener(e -> mostrarTurn());
-        btnRiver.addActionListener(e -> mostrarRiver());
-        btnReset.addActionListener(e -> reset());
-        btnComprobar.addActionListener(e -> onComprobarRango());
+        // Uso de ActionCommand + un único controlador
+        btnDeal.setActionCommand("DEAL");           btnDeal.addActionListener(controller);
+        btnFlop.setActionCommand("FLOP");           btnFlop.addActionListener(controller);
+        btnTurn.setActionCommand("TURN");           btnTurn.addActionListener(controller);
+        btnRiver.setActionCommand("RIVER");         btnRiver.addActionListener(controller);
+        btnReset.setActionCommand("RESET");         btnReset.addActionListener(controller);
+        btnComprobar.setActionCommand("COMPROBAR"); btnComprobar.addActionListener(controller);
 
         buttonPanel.add(btnDeal);
         buttonPanel.add(btnFlop);
@@ -193,97 +197,6 @@ public class PokerEquityGUI extends JFrame {
 
         panel.add(buttonPanel, BorderLayout.EAST);
         return panel;
-    }
-
-    private void onComprobarRango() {
-        String rango = JOptionPane.showInputDialog(this,
-                "Introduce un rango (por ejemplo: AA,KK,AKs,AQo):",
-                "Comprobar rango", JOptionPane.PLAIN_MESSAGE);
-
-        if (rango != null && !rango.isEmpty()) {
-            if (!RangeParser.isBasicFormat(rango)) {
-                JOptionPane.showMessageDialog(this,
-                        "Formato no válido. Ej: AA,KK,AKs,AQo",
-                        "Error", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-            try {
-                List<String> manos = RangeParser.parse(rango);
-
-                // Elegimos una mano del rango y la convertimos a cartas concretas sin duplicar
-                Random rand = new Random();
-                String manoElegida = manos.get(rand.nextInt(manos.size()));
-                String cartasConcretas = generarCartasConcretasDesdeNotacion(manoElegida);
-
-                // Asignar al héroe (índice 4), actualizar modelo y purgar mazo
-                PlayerPanel heroPanel = playerPanels.get(4);
-                heroPanel.setCards(cartasConcretas);
-                state.setPlayerHand(4, Hand.fromString(cartasConcretas));
-
-                if (deck != null) {
-                    deck.removeCards(state.allUsedCards()); // evita que esas cartas salgan en el board
-                }
-
-                // Recalcular equities
-                updateEquities();
-
-                JOptionPane.showMessageDialog(this,
-                        "Mano asignada al héroe: " + manoElegida + " (" + cartasConcretas + ")",
-                        "Rango aplicado",
-                        JOptionPane.INFORMATION_MESSAGE);
-
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this,
-                        "Error al analizar el rango: " + ex.getMessage(),
-                        "Error", JOptionPane.ERROR_MESSAGE);
-            }
-        }
-    }
-
-    /**
-     * Genera dos cartas concretas a partir de notación de rango (AA, AKs, AKo, TT, etc.),
-     * evitando duplicados con respecto a state.allUsedCards().
-     */
-    private String generarCartasConcretasDesdeNotacion(String notacion) {
-        String[] palos = {"h", "d", "c", "s"};
-        Random rand = new Random();
-        String n = notacion.toUpperCase(Locale.ROOT);
-
-        // Elimina sufijo S/O para obtener los dos rangos base
-        String base = n.replaceAll("[SO]$", "");
-        if (base.length() != 2) {
-            throw new IllegalArgumentException("Notación inválida: " + notacion);
-        }
-        char r1 = base.charAt(0);
-        char r2 = base.charAt(1);
-
-        // Cartas ya usadas (manos + board)
-        Set<String> used = new HashSet<>(state.allUsedCards());
-
-        // Intentamos varias combinaciones hasta encontrar una válida
-        for (int intentos = 0; intentos < 100; intentos++) {
-            String c1, c2;
-            if (n.endsWith("S")) { // suited
-                String p = palos[rand.nextInt(4)];
-                c1 = "" + r1 + p;
-                c2 = "" + r2 + p;
-            } else if (n.endsWith("O")) { // offsuit
-                String p1 = palos[rand.nextInt(4)], p2;
-                do { p2 = palos[rand.nextInt(4)]; } while (p1.equals(p2));
-                c1 = "" + r1 + p1;
-                c2 = "" + r2 + p2;
-            } else { // pareja (sin sufijo)
-                String p1 = palos[rand.nextInt(4)], p2;
-                do { p2 = palos[rand.nextInt(4)]; } while (p1.equals(p2));
-                c1 = "" + r1 + p1;
-                c2 = "" + r2 + p2;
-            }
-
-            if (!c1.equals(c2) && !used.contains(c1) && !used.contains(c2)) {
-                return c1 + c2;
-            }
-        }
-        throw new IllegalStateException("No se pudo generar una combinación válida sin duplicados.");
     }
 
     private JButton createStyledButton(String text) {
@@ -307,92 +220,8 @@ public class PokerEquityGUI extends JFrame {
     }
 
     /* ======================
-       LÓGICA CON DECK + PHASE + EQUITY + GAMESTATE + VALIDACIÓN
+       VISTA: helpers que el controlador usa
        ====================== */
-
-    private void repartirCartas() {
-        deck = new Deck();
-        state.reset();
-
-        // Si existieran cartas fijadas previamente, se purgarían aquí
-        deck.removeCards(state.allUsedCards());
-
-        for (int i = 0; i < playerPanels.size(); i++) {
-            PlayerPanel pp = playerPanels.get(i);
-            String c1 = drawUnique();
-            String c2 = drawUnique();
-            pp.setCards(c1 + c2);
-            state.setPlayerHand(i, new Hand(c1, c2));
-        }
-
-        phase = Phase.PREFLOP;
-        state.setPhase(phase);
-        tablePanel.repaint();
-
-        updateButtonsState();
-        updateEquities();
-    }
-
-    private void mostrarFlop() {
-        if (deck == null) return;
-        if (phase == Phase.PREFLOP) {
-            deck.removeCards(state.allUsedCards());
-
-            String c1 = drawUnique();
-            String c2 = drawUnique();
-            String c3 = drawUnique();
-            state.getBoard().setFlop(c1, c2, c3);
-
-            phase = Phase.FLOP;
-            state.setPhase(phase);
-            tablePanel.repaint();
-            updateButtonsState();
-            updateEquities();
-        }
-    }
-
-    private void mostrarTurn() {
-        if (deck == null) return;
-        if (phase == Phase.FLOP) {
-            deck.removeCards(state.allUsedCards());
-
-            String c4 = drawUnique();
-            state.getBoard().setTurn(c4);
-
-            phase = Phase.TURN;
-            state.setPhase(phase);
-            tablePanel.repaint();
-            updateButtonsState();
-            updateEquities();
-        }
-    }
-
-    private void mostrarRiver() {
-        if (deck == null) return;
-        if (phase == Phase.TURN) {
-            deck.removeCards(state.allUsedCards());
-
-            String c5 = drawUnique();
-            state.getBoard().setRiver(c5);
-
-            phase = Phase.RIVER;
-            state.setPhase(phase);
-            tablePanel.repaint();
-            updateButtonsState();
-            updateEquities();
-        }
-    }
-
-    private void reset() {
-        phase = Phase.PREFLOP;
-        state.reset();
-        deck = null;
-
-        tablePanel.repaint();
-        for (PlayerPanel pp : playerPanels) pp.reset();
-
-        updateButtonsState();
-    }
 
     private void updateButtonsState() {
         if (btnDeal != null)  btnDeal.setEnabled(true);
@@ -421,14 +250,208 @@ public class PokerEquityGUI extends JFrame {
         }
     }
 
-    /** Roba del mazo garantizando que no devuelva cartas ya usadas según GameState. */
-    private String drawUnique() {
-        Set<String> used = new HashSet<>(state.allUsedCards());
-        String c;
-        do {
-            c = deck.draw();
-        } while (used.contains(c));
-        return c;
+    /** =====================
+     *  CONTROLADOR (MVC)
+     *  ===================== */
+    private final class Controller implements ActionListener {
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            String cmd = e.getActionCommand();
+            switch (cmd) {
+                case "DEAL"       -> repartirCartas();
+                case "FLOP"       -> mostrarFlop();
+                case "TURN"       -> mostrarTurn();
+                case "RIVER"      -> mostrarRiver();
+                case "RESET"      -> reset();
+                case "COMPROBAR"  -> onComprobarRango();
+            }
+        }
+
+        private void onComprobarRango() {
+            String rango = JOptionPane.showInputDialog(PokerEquityGUI.this,
+                    "Introduce un rango (por ejemplo: AA,KK,AKs,AQo):",
+                    "Comprobar rango", JOptionPane.PLAIN_MESSAGE);
+
+            if (rango != null && !rango.isEmpty()) {
+                if (!RangeParser.isBasicFormat(rango)) {
+                    JOptionPane.showMessageDialog(PokerEquityGUI.this,
+                            "Formato no válido. Ej: AA,KK,AKs,AQo",
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                try {
+                    List<String> manos = RangeParser.parse(rango);
+
+                    // Elegimos una mano del rango y la convertimos a cartas concretas sin duplicar
+                    Random rand = new Random();
+                    String manoElegida = manos.get(rand.nextInt(manos.size()));
+                    String cartasConcretas = generarCartasConcretasDesdeNotacion(manoElegida);
+
+                    // Asignar al héroe (índice 4), actualizar modelo y purgar mazo
+                    PlayerPanel heroPanel = playerPanels.get(4);
+                    heroPanel.setCards(cartasConcretas);
+                    state.setPlayerHand(4, Hand.fromString(cartasConcretas));
+
+                    if (deck != null) {
+                        deck.removeCards(state.allUsedCards()); // evita que esas cartas salgan en el board
+                    }
+
+                    // Recalcular equities
+                    updateEquities();
+
+                    JOptionPane.showMessageDialog(PokerEquityGUI.this,
+                            "Mano asignada al héroe: " + manoElegida + " (" + cartasConcretas + ")",
+                            "Rango aplicado",
+                            JOptionPane.INFORMATION_MESSAGE);
+
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(PokerEquityGUI.this,
+                            "Error al analizar el rango: " + ex.getMessage(),
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        }
+
+        /**
+         * Genera dos cartas concretas a partir de notación de rango (AA, AKs, AKo, TT, etc.),
+         * evitando duplicados con respecto a state.allUsedCards().
+         */
+        private String generarCartasConcretasDesdeNotacion(String notacion) {
+            String[] palos = {"h", "d", "c", "s"};
+            Random rand = new Random();
+            String n = notacion.toUpperCase(Locale.ROOT);
+
+            // Elimina sufijo S/O para obtener los dos rangos base
+            String base = n.replaceAll("[SO]$", "");
+            if (base.length() != 2) {
+                throw new IllegalArgumentException("Notación inválida: " + notacion);
+            }
+            char r1 = base.charAt(0);
+            char r2 = base.charAt(1);
+
+            // Cartas ya usadas (manos + board)
+            Set<String> used = new HashSet<>(state.allUsedCards());
+
+            // Intentamos varias combinaciones hasta encontrar una válida
+            for (int intentos = 0; intentos < 100; intentos++) {
+                String c1, c2;
+                if (n.endsWith("S")) { // suited
+                    String p = palos[rand.nextInt(4)];
+                    c1 = "" + r1 + p;
+                    c2 = "" + r2 + p;
+                } else if (n.endsWith("O")) { // offsuit
+                    String p1 = palos[rand.nextInt(4)], p2;
+                    do { p2 = palos[rand.nextInt(4)]; } while (p1.equals(p2));
+                    c1 = "" + r1 + p1;
+                    c2 = "" + r2 + p2;
+                } else { // pareja (sin sufijo)
+                    String p1 = palos[rand.nextInt(4)], p2;
+                    do { p2 = palos[rand.nextInt(4)]; } while (p1.equals(p2));
+                    c1 = "" + r1 + p1;
+                    c2 = "" + r2 + p2;
+                }
+
+                if (!c1.equals(c2) && !used.contains(c1) && !used.contains(c2)) {
+                    return c1 + c2;
+                }
+            }
+            throw new IllegalStateException("No se pudo generar una combinación válida sin duplicados.");
+        }
+
+        /* ======================
+           LÓGICA CON DECK + PHASE + GAMESTATE
+           ====================== */
+
+        private void repartirCartas() {
+            deck = new Deck();
+            state.reset();
+            deck.removeCards(state.allUsedCards());
+
+            for (int i = 0; i < playerPanels.size(); i++) {
+                PlayerPanel pp = playerPanels.get(i);
+                String c1 = drawUnique();
+                String c2 = drawUnique();
+                pp.setCards(c1 + c2);
+                state.setPlayerHand(i, new Hand(c1, c2));
+            }
+
+            phase = Phase.PREFLOP;
+            state.setPhase(phase);
+            tablePanel.repaint();
+
+            updateButtonsState();
+            updateEquities();
+        }
+
+        private void mostrarFlop() {
+            if (deck == null) return;
+            if (phase == Phase.PREFLOP) {
+                deck.removeCards(state.allUsedCards());
+
+                String c1 = drawUnique();
+                String c2 = drawUnique();
+                String c3 = drawUnique();
+                state.getBoard().setFlop(c1, c2, c3);
+
+                phase = Phase.FLOP;
+                state.setPhase(phase);
+                tablePanel.repaint();
+                updateButtonsState();
+                updateEquities();
+            }
+        }
+
+        private void mostrarTurn() {
+            if (deck == null) return;
+            if (phase == Phase.FLOP) {
+                deck.removeCards(state.allUsedCards());
+
+                String c4 = drawUnique();
+                state.getBoard().setTurn(c4);
+
+                phase = Phase.TURN;
+                state.setPhase(phase);
+                tablePanel.repaint();
+                updateButtonsState();
+                updateEquities();
+            }
+        }
+
+        private void mostrarRiver() {
+            if (deck == null) return;
+            if (phase == Phase.TURN) {
+                deck.removeCards(state.allUsedCards());
+
+                String c5 = drawUnique();
+                state.getBoard().setRiver(c5);
+
+                phase = Phase.RIVER;
+                state.setPhase(phase);
+                tablePanel.repaint();
+                updateButtonsState();
+                updateEquities();
+            }
+        }
+
+        private void reset() {
+            phase = Phase.PREFLOP;
+            state.reset();
+            deck = null;
+
+            tablePanel.repaint();
+            for (PlayerPanel pp : playerPanels) pp.reset();
+
+            updateButtonsState();
+        }
+
+        /** Roba del mazo garantizando que no devuelva cartas ya usadas según GameState. */
+        private String drawUnique() {
+            Set<String> used = new HashSet<>(state.allUsedCards());
+            String c;
+            do { c = deck.draw(); } while (used.contains(c));
+            return c;
+        }
     }
 
     public static void main(String[] args) {
