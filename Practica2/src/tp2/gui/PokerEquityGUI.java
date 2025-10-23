@@ -195,9 +195,6 @@ public class PokerEquityGUI extends JFrame {
         return panel;
     }
 
-    
-
-
     private void onComprobarRango() {
         String rango = JOptionPane.showInputDialog(this,
                 "Introduce un rango (por ejemplo: AA,KK,AKs,AQo):",
@@ -212,27 +209,29 @@ public class PokerEquityGUI extends JFrame {
             }
             try {
                 List<String> manos = RangeParser.parse(rango);
-                
+
+                // Elegimos una mano del rango y la convertimos a cartas concretas sin duplicar
                 Random rand = new Random();
                 String manoElegida = manos.get(rand.nextInt(manos.size()));
-                
                 String cartasConcretas = generarCartasConcretasDesdeNotacion(manoElegida);
-                
-                
+
+                // Asignar al héroe (índice 4), actualizar modelo y purgar mazo
                 PlayerPanel heroPanel = playerPanels.get(4);
                 heroPanel.setCards(cartasConcretas);
-                
-                
                 state.setPlayerHand(4, Hand.fromString(cartasConcretas));
-                
-                //para Recalcular equities
+
+                if (deck != null) {
+                    deck.removeCards(state.allUsedCards()); // evita que esas cartas salgan en el board
+                }
+
+                // Recalcular equities
                 updateEquities();
-                
+
                 JOptionPane.showMessageDialog(this,
-                        "Mano asignada al heroe: " + manoElegida + " (" + cartasConcretas + ")",
+                        "Mano asignada al héroe: " + manoElegida + " (" + cartasConcretas + ")",
                         "Rango aplicado",
                         JOptionPane.INFORMATION_MESSAGE);
-                        
+
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(this,
                         "Error al analizar el rango: " + ex.getMessage(),
@@ -241,44 +240,50 @@ public class PokerEquityGUI extends JFrame {
         }
     }
 
-
-
+    /**
+     * Genera dos cartas concretas a partir de notación de rango (AA, AKs, AKo, TT, etc.),
+     * evitando duplicados con respecto a state.allUsedCards().
+     */
     private String generarCartasConcretasDesdeNotacion(String notacion) {
-    	 String[] palos = {"h", "d", "c", "s"};
-    	    Random rand = new Random();
-    	    String notacionUpper = notacion.toUpperCase();
-    	    
-    	    // Expresion regular
-    	    String base = notacionUpper.replaceAll("[SO]$", "");
-    	    
-    	    if (base.length() != 2) {
-    	        throw new IllegalArgumentException("Notación inválida: " + notacion);
-    	    }
-    	    
-    	    char rank1 = base.charAt(0);
-    	    char rank2 = base.charAt(1);
-    	    
-    	    if (notacionUpper.endsWith("S")) { 
-    	        // Suited
-    	        String palo = palos[rand.nextInt(4)];
-    	        return "" + rank1 + palo + rank2 + palo;
-    	    } else if (notacionUpper.endsWith("O")) { 
-    	        // Offsuit
-    	        String palo1 = palos[rand.nextInt(4)];
-    	        String palo2;
-    	        do {
-    	            palo2 = palos[rand.nextInt(4)];
-    	        } while (palo1.equals(palo2));
-    	        return "" + rank1 + palo1 + rank2 + palo2;
-    	    } else {
-    	        // Par
-    	        String palo1 = palos[rand.nextInt(4)];
-    	        String palo2;
-    	        do {
-    	            palo2 = palos[rand.nextInt(4)];
-    	        } while (palo1.equals(palo2));
-    	        return "" + rank1 + palo1 + rank2 + palo2;
-    	    }
+        String[] palos = {"h", "d", "c", "s"};
+        Random rand = new Random();
+        String n = notacion.toUpperCase(Locale.ROOT);
+
+        // Elimina sufijo S/O para obtener los dos rangos base
+        String base = n.replaceAll("[SO]$", "");
+        if (base.length() != 2) {
+            throw new IllegalArgumentException("Notación inválida: " + notacion);
+        }
+        char r1 = base.charAt(0);
+        char r2 = base.charAt(1);
+
+        // Cartas ya usadas (manos + board)
+        Set<String> used = new HashSet<>(state.allUsedCards());
+
+        // Intentamos varias combinaciones hasta encontrar una válida
+        for (int intentos = 0; intentos < 100; intentos++) {
+            String c1, c2;
+            if (n.endsWith("S")) { // suited
+                String p = palos[rand.nextInt(4)];
+                c1 = "" + r1 + p;
+                c2 = "" + r2 + p;
+            } else if (n.endsWith("O")) { // offsuit
+                String p1 = palos[rand.nextInt(4)], p2;
+                do { p2 = palos[rand.nextInt(4)]; } while (p1.equals(p2));
+                c1 = "" + r1 + p1;
+                c2 = "" + r2 + p2;
+            } else { // pareja (sin sufijo)
+                String p1 = palos[rand.nextInt(4)], p2;
+                do { p2 = palos[rand.nextInt(4)]; } while (p1.equals(p2));
+                c1 = "" + r1 + p1;
+                c2 = "" + r2 + p2;
+            }
+
+            if (!c1.equals(c2) && !used.contains(c1) && !used.contains(c2)) {
+                return c1 + c2;
+            }
+        }
+        throw new IllegalStateException("No se pudo generar una combinación válida sin duplicados.");
     }
 
     private JButton createStyledButton(String text) {
@@ -331,7 +336,6 @@ public class PokerEquityGUI extends JFrame {
     private void mostrarFlop() {
         if (deck == null) return;
         if (phase == Phase.PREFLOP) {
-            // Purga por si añadiste cartas manualmente al modelo antes del flop
             deck.removeCards(state.allUsedCards());
 
             String c1 = drawUnique();
@@ -423,7 +427,6 @@ public class PokerEquityGUI extends JFrame {
         String c;
         do {
             c = deck.draw();
-            // Si por cualquier motivo ya se usó (p. ej., carta fijada manualmente), se “descarta” y se saca otra
         } while (used.contains(c));
         return c;
     }
