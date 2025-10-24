@@ -1,6 +1,7 @@
 package tp2.gui;
 
 import javax.swing.*;
+import javax.swing.JOptionPane;
 import javax.swing.border.*;
 import java.awt.*;
 import java.awt.event.*;
@@ -274,30 +275,38 @@ public class PokerEquityGUI extends JFrame {
                     "Comprobar rango", JOptionPane.PLAIN_MESSAGE);
 
             if (rango != null && !rango.isEmpty()) {
-                if (!RangeParser.isBasicFormat(rango)) {
-                    JOptionPane.showMessageDialog(PokerEquityGUI.this,
-                            "Formato no válido. Ej: AA,KK,AKs,AQo",
-                            "Error", JOptionPane.ERROR_MESSAGE);
-                    return;
-                }
                 try {
+                    // Validamos formato
+                    if (!RangeParser.isBasicFormat(rango)) {
+                        JOptionPane.showMessageDialog(PokerEquityGUI.this,
+                                "Error en la entrada.\nUsa formato como: AA,KK,AKs,AQo",
+                                "Rango inválido",
+                                JOptionPane.ERROR_MESSAGE);
+                        return;
+                    }
+
+                    // Si es válido → parseamos
                     List<String> manos = RangeParser.parse(rango);
 
-                    // Elegimos una mano del rango y la convertimos a cartas concretas sin duplicar
+                    // Mostramos mensaje de rango válido
+                    JOptionPane.showMessageDialog(PokerEquityGUI.this,
+                            "Rango válido:\n" + manos,
+                            "Rango válido",
+                            JOptionPane.INFORMATION_MESSAGE);
+
+                    // --- resto de tu código actual ---
                     Random rand = new Random();
                     String manoElegida = manos.get(rand.nextInt(manos.size()));
                     String cartasConcretas = generarCartasConcretasDesdeNotacion(manoElegida);
 
-                    // Asignar al héroe (índice 4), actualizar modelo y purgar mazo
                     PlayerPanel heroPanel = playerPanels.get(4);
                     heroPanel.setCards(cartasConcretas);
                     state.setPlayerHand(4, Hand.fromString(cartasConcretas));
 
                     if (deck != null) {
-                        deck.removeCards(state.allUsedCards()); // evita que esas cartas salgan en el board
+                        deck.removeCards(state.allUsedCards());
                     }
 
-                    // Recalcular equities
                     updateEquities();
 
                     JOptionPane.showMessageDialog(PokerEquityGUI.this,
@@ -307,11 +316,13 @@ public class PokerEquityGUI extends JFrame {
 
                 } catch (Exception ex) {
                     JOptionPane.showMessageDialog(PokerEquityGUI.this,
-                            "Error al analizar el rango: " + ex.getMessage(),
-                            "Error", JOptionPane.ERROR_MESSAGE);
+                            "Error en la entrada: " + ex.getMessage(),
+                            "Error en el rango",
+                            JOptionPane.ERROR_MESSAGE);
                 }
             }
         }
+
 
         /**
          * Genera dos cartas concretas a partir de notación de rango (AA, AKs, AKo, TT, etc.),
@@ -382,6 +393,11 @@ public class PokerEquityGUI extends JFrame {
 
             updateButtonsState();
             updateEquities();
+            
+            JOptionPane.showMessageDialog(PokerEquityGUI.this,
+                    "Equity calculada correctamente.",
+                    "Equity calculada",
+                    JOptionPane.INFORMATION_MESSAGE);
         }
 
         private void mostrarFlop() {

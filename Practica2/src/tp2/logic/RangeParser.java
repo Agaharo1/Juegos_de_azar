@@ -13,15 +13,27 @@ public class RangeParser {
         return input.trim().matches("^\\s*" + TOKEN + "(\\s*,\\s*" + TOKEN + ")*\\s*$");
     }
 
-    /** Stub: separa por comas, limpia espacios y normaliza a mayúsculas. */
+    /**
+     * Parsea el rango textual. 
+     * Si el formato es inválido, lanza IllegalArgumentException.
+     */
     public static List<String> parse(String rango) {
-        if (rango == null) return Collections.emptyList();
+        if (rango == null || rango.isBlank()) {
+            throw new IllegalArgumentException("El rango no puede estar vacío");
+        }
+
+        if (!isBasicFormat(rango)) {
+            throw new IllegalArgumentException("Formato de rango inválido. Usa algo como: AA,AKs,AQo");
+        }
+
         String[] partes = rango.split(",");
         List<String> manos = new ArrayList<>();
+
         for (String p : partes) {
             String t = p.trim().toUpperCase(Locale.ROOT);
             if (!t.isEmpty()) manos.add(t);
         }
+
         return manos;
     }
 }
