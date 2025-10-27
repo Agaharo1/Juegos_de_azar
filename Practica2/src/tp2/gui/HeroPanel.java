@@ -18,7 +18,6 @@ public class HeroPanel extends JPanel {
         updateRangeFields(); // asegura enabled/disabled correcto al iniciar
     }
 
-
     private void initializeComponents() {
         setLayout(new BoxLayout(this, BoxLayout.X_AXIS));
         setBackground(UiTheme.BG_PANEL);
@@ -147,7 +146,7 @@ public class HeroPanel extends JPanel {
         field.setBackground(UiTheme.BG_INPUT);
         field.setForeground(UiTheme.FG_TEXT);
         field.setBorder(BorderFactory.createLineBorder(UiTheme.BORDER,1));
-        field.setCaretColor(new Color(150,150,150)); // este puede quedarse literal
+        field.setCaretColor(new Color(150,150,150));
         return field;
     }
 
@@ -156,4 +155,12 @@ public class HeroPanel extends JPanel {
         rankingCombo.setEnabled(rbPercentageRange.isSelected());
         percentageSpinner.setEnabled(rbPercentageRange.isSelected());
     }
+
+    /** ==== API pública para que la GUI/Controller lea la UI ==== */
+    public boolean isTextualSelected()   { return rbTextualRange.isSelected(); }
+    public boolean isPercentageSelected(){ return rbPercentageRange.isSelected(); }
+    public String  getTextualRange()     { return textualRangeField.getText(); }
+    public int     getPercentage()       { return (int) percentageSpinner.getValue(); }
+    public boolean isRandomCards()       { return cbRandomCards.isSelected(); }
+    public boolean isRandomBoard()       { return cbRandomBoard.isSelected(); }
 }
