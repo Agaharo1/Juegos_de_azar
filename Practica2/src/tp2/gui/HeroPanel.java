@@ -3,7 +3,7 @@ package tp2.gui;
 import javax.swing.*;
 import javax.swing.border.*;
 import java.awt.*;
-
+import java.awt.event.ItemListener;
 /**
  * Panel de controles del "héroe" (el jugador principal).
  * Aquí el usuario elige cómo definir su rango (texto o porcentaje),
@@ -41,6 +41,11 @@ public class HeroPanel extends JPanel {
         initializeComponents();
         updateRangeFields(); // asegura que lo que toca esté activo/inactivo al iniciar
     }
+    
+    public void addRandomBoardListener(ItemListener l) {
+    	 cbRandomBoard.addItemListener(l);
+    	}
+
 
     /**
      * Crea y coloca todos los bloques del panel (de izquierda a derecha).
