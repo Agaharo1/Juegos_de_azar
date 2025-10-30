@@ -268,4 +268,20 @@ public class HeroPanel extends JPanel {
 
     /** Devuelve true si el board (flop/turn/river) debe salir aleatorio. */
     public boolean isRandomBoard()       { return cbRandomBoard.isSelected(); }
+    
+    // ==== Métodos añadidos para el feedback de rango ====
+
+    /**
+     * Establece el color de fondo para el campo de texto del rango.
+     * Útil para indicar visualmente si la mano actual del héroe está en rango (verde/rojo).
+     */
+    public void setRangeFeedbackColor(Color color) {
+        if (textualRangeField != null) {
+            Color neutralColor = UiTheme.BG_INPUT;
+            textualRangeField.setBackground(color);
+            // Asegura que el texto sea legible
+            textualRangeField.setForeground(color.equals(neutralColor) ? UiTheme.FG_TEXT : Color.WHITE);
+            textualRangeField.repaint();
+        }
+    }
 }

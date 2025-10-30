@@ -7,6 +7,7 @@ import java.awt.event.*;
 import java.util.*;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 
 import tp2.logic.Deck;
 import tp2.logic.RangeParser;
@@ -53,6 +54,11 @@ public class PokerEquityGUI extends JFrame {
 
     // Controlador
     private final Controller controller = new Controller();
+    
+    // Colores para el feedback de rango
+    private static final Color RANGE_IN_COLOR  = new Color(60, 180, 75); 
+    private static final Color RANGE_OUT_COLOR = new Color(180, 60, 60); 
+    private final Color NEUTRAL_COLOR = UiTheme.BG_INPUT; 
 
     public PokerEquityGUI() {
         setTitle("Poker Equity Calculator");
@@ -85,6 +91,7 @@ public class PokerEquityGUI extends JFrame {
 
         add(mainPanel);
     }
+    
 
     private JPanel createTablePanel() {
         JPanel panel = new JPanel() {
@@ -192,6 +199,7 @@ public class PokerEquityGUI extends JFrame {
         panel.setBackground(UiTheme.BG_PANEL);
 
         heroPanel = new HeroPanel();
+        heroPanel.setRangeFeedbackColor(NEUTRAL_COLOR);
         heroPanel.addRandomBoardListener(e -> updateButtonsState());
         panel.add(heroPanel, BorderLayout.CENTER);
 
@@ -332,6 +340,97 @@ public class PokerEquityGUI extends JFrame {
     }
 
     // =========================
+    //   Lógica de Rango y Feedback
+    // =========================
+
+    // --- Helper: Convertir mano concreta (AhKd) a notación abreviada (AKo, AA, AJs) ---
+    private String handToShorthand(Hand hand) {
+        if (hand == null) return null;
+        
+        char r1 = hand.card1().charAt(0);
+        char s1 = hand.card1().charAt(1);
+        char r2 = hand.card2().charAt(0);
+        char s2 = hand.card2().charAt(1);
+
+        String ranks = "23456789TJQKA";
+        int v1 = ranks.indexOf(r1);
+        int v2 = ranks.indexOf(r2);
+        
+        // Obtener los rangos ordenados (high card primero)
+        char highR = (v1 >= v2) ? r1 : r2;
+        char lowR  = (v1 >= v2) ? r2 : r1;
+        
+        if (r1 == r2) { // Pareja
+            return "" + r1 + r2; 
+        }
+
+        boolean suited = (s1 == s2);
+        return "" + highR + lowR + (suited ? "s" : "o"); 
+    }
+    
+    private Boolean isHandInRange(Hand hand) {
+        if (hand == null) {
+            return null; 
+        }
+        
+        String handShorthand = handToShorthand(hand);
+        if (handShorthand == null) return false;
+
+        if (heroPanel.isTextualSelected()) {
+            // Modo Rango Textual
+            String rangeText = heroPanel.getTextualRange();
+            List<String> rangeList = RangeParser.parse(rangeText); 
+            return rangeList.contains(handShorthand);
+            
+        } else if (heroPanel.isPercentageSelected()) {
+            
+            int pct = heroPanel.getPercentage();
+            boolean[][][] mask = RankingProvider.getMaskForPercent(pct / 100.0);
+            
+            
+            char r1 = handShorthand.charAt(0);
+            char r2 = handShorthand.charAt(1);
+            boolean suited = handShorthand.endsWith("s");
+            
+            String ranks = "23456789TJQKA";
+            int i1 = ranks.indexOf(r1);
+            int i2 = ranks.indexOf(r2);
+            
+            if (i1 < 0 || i2 < 0) return false;
+
+            int highIdx = Math.max(i1, i2);
+            int lowIdx  = Math.min(i1, i2);
+            int layer = suited ? 1 : 0;
+            
+            
+            if (r1 == r2) {
+                 return mask[i1][i1][0]; 
+            }
+            
+            return mask[highIdx][lowIdx][layer];
+        }
+        
+        return null; 
+    }
+    
+    
+    private void refreshRangeFeedback() {
+        Hand heroHand = stateGetPlayerHand(4); 
+        Boolean inRange = isHandInRange(heroHand);
+        
+        // 1. Actualiza el campo de texto en HeroPanel
+        if (inRange == null) {
+            heroPanel.setRangeFeedbackColor(NEUTRAL_COLOR);
+        } else if (inRange) {
+            heroPanel.setRangeFeedbackColor(RANGE_IN_COLOR);
+        } else {
+            heroPanel.setRangeFeedbackColor(RANGE_OUT_COLOR);
+        }
+
+        // 2. Actualiza el borde en PlayerPanel
+        playerPanels.get(4).setRangeFeedback(inRange);
+    }
+    // =========================
     //   Edición de manos
     // =========================
     private void abrirEditorMano(int seat) {
@@ -352,6 +451,7 @@ public class PokerEquityGUI extends JFrame {
                     playerPanels.get(seat).setCards(hand.toString());
                     syncDeckAfterChange();
                     updateEquities();
+                    if (seat == 4) refreshRangeFeedback();
                     tablePanel.repaint();
                     statusBar.setMessage("Mano fijada en jugador " + (seat + 1));
                 },
@@ -360,6 +460,7 @@ public class PokerEquityGUI extends JFrame {
                     playerPanels.get(seat).setCards("");
                     syncDeckAfterChange();
                     updateEquities();
+                    if (seat == 4) refreshRangeFeedback();
                     tablePanel.repaint();
                     statusBar.setMessage("Mano quitada en jugador " + (seat + 1));
                 }
@@ -372,9 +473,11 @@ public class PokerEquityGUI extends JFrame {
         playerPanels.get(seat).setCards("");
         syncDeckAfterChange();
         updateEquities();
+        if (seat == 4) refreshRangeFeedback();
         tablePanel.repaint();
         statusBar.setMessage("Mano quitada en jugador " + (seat + 1));
     }
+    
 
     // =========================
     //   Controlador de botones
@@ -436,6 +539,7 @@ public class PokerEquityGUI extends JFrame {
                 if (deck != null) deck.removeCards(state.allUsedCards());
 
                 updateEquities();
+                refreshRangeFeedback();
                 statusBar.setMessage("Héroe fijado desde rango.");
                 statusBar.setRight("Mazo restante: " + (deck != null ? deck.remaining() : 0));
 
@@ -514,6 +618,8 @@ public class PokerEquityGUI extends JFrame {
 
             updateButtonsState();
             updateEquities();
+            
+            refreshRangeFeedback();
 
             statusBar.setMessage("Cartas repartidas. Fase: PREFLOP");
             statusBar.setRight("Mazo restante: " + deck.remaining());
@@ -639,7 +745,8 @@ public class PokerEquityGUI extends JFrame {
             } while (used.contains(c));
             return c;
         }
-    }
+        
+    } // Fin de la clase Controller
 
     // =========================
     //   Main

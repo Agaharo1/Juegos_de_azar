@@ -2,6 +2,8 @@ package tp2.gui;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.border.Border;
+import javax.swing.border.LineBorder;
 import java.awt.*;
 import java.util.Locale;
 
@@ -12,6 +14,8 @@ public class PlayerPanel extends JPanel {
     private String cards = "";
     private JLabel equityField;
     private CardsPanel cardsPanel;
+
+    private Color rangeFeedbackColor = null; // Almacena el color de feedback (verde/rojo)
 
     // Hooks
     private JButton editBtn;
@@ -24,14 +28,26 @@ public class PlayerPanel extends JPanel {
         this.isHero = isHero;
         initializeComponents();
     }
+    
+    /**
+     * Actualiza el borde del panel. Utiliza rangeFeedbackColor si está establecido,
+     * o el color por defecto (HERO_BORDER o BORDER) si no hay feedback de rango.
+     */
+    private void updateBorder() {
+        Color mainColor = isHero ? UiTheme.HERO_BORDER : UiTheme.BORDER;
+        Color borderColor = (rangeFeedbackColor != null) ? rangeFeedbackColor : mainColor;
+        
+        setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(borderColor, 3),
+            new EmptyBorder(5, 5, 5, 5)
+        ));
+    }
 
     private void initializeComponents() {
         setLayout(new BorderLayout(2, 2));
         setBackground(UiTheme.BG_CARD);
-        setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(isHero ? UiTheme.HERO_BORDER : UiTheme.BORDER, 3),
-                new EmptyBorder(5, 5, 5, 5)
-        ));
+        // Llama a updateBorder() en lugar de setBorder directamente
+        updateBorder(); 
 
         // ---- Top: nombre + botón Editar (estilo Alberto)
         JPanel top = new JPanel(new FlowLayout(FlowLayout.CENTER, 6, 0));
@@ -109,6 +125,21 @@ public class PlayerPanel extends JPanel {
     public void setEquity(double pct) {
         equityField.setText(String.format(Locale.ROOT, "%.1f%%", pct));
     }
+    
+    /**
+     * Establece el color de feedback del rango.
+     * null = neutral/sin mano; true = dentro (verde); false = fuera (rojo).
+     */
+    public void setRangeFeedback(Boolean inRange) {
+        if (inRange == null) {
+            this.rangeFeedbackColor = null; 
+        } else if (inRange) {
+            this.rangeFeedbackColor = new Color(60, 180, 75); // Verde sutil
+        } else {
+            this.rangeFeedbackColor = new Color(180, 60, 60); // Rojo sutil
+        }
+        updateBorder(); // Actualiza el borde inmediatamente
+    }
 
     public String getPlayerName() { return playerName; }
 
@@ -116,6 +147,7 @@ public class PlayerPanel extends JPanel {
         cards = "";
         cardsPanel.setCards("");
         equityField.setText("0.0%");
+        setRangeFeedback(null); // Resetea el feedback del rango a neutral
     }
 
     public void setOnEditHand(Runnable r)  { this.onEditHand  = r; }
