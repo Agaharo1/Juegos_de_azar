@@ -26,6 +26,12 @@ public class PlayerPanel extends JPanel {
     // Panel interno que se encarga de dibujar las imágenes de las cartas
     private CardsPanel cardsPanel;
 
+    // --- NUEVO: botones y hooks para editar/quitar mano ---
+    private JButton editBtn;
+    private JButton clearBtn;
+    private Runnable onEditHand;   // callback que conectarás desde la GUI principal
+    private Runnable onClearHand;  // callback que conectarás desde la GUI principal
+
     /**
      * Crea el panel del jugador con su nombre y si es héroe o no.
      * Llama a un método interno para construir toda la interfaz.
@@ -40,7 +46,7 @@ public class PlayerPanel extends JPanel {
      * Construye la estructura visual:
      * - Arriba: nombre del jugador.
      * - Centro: sus cartas (dibujadas como imágenes).
-     * - Abajo: un "chip" con el porcentaje de equity.
+     * - Abajo: chip con equity + fila de botones (Editar mano / Quitar mano).
      */
     private void initializeComponents() {
         setLayout(new BorderLayout(2, 2));
@@ -67,26 +73,27 @@ public class PlayerPanel extends JPanel {
         cardsPanel = new CardsPanel();
         add(cardsPanel, BorderLayout.CENTER);
 
-        // ---- Parte inferior: chip con la equity
+        // ---- Contenedor inferior (vertical): equity + botones
+        JPanel southContainer = new JPanel();
+        southContainer.setLayout(new BoxLayout(southContainer, BoxLayout.Y_AXIS));
+        southContainer.setOpaque(false);
+
+        // ---- Chip con equity
         JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
         bottomPanel.setBackground(UiTheme.BG_CARD);
-        bottomPanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+        bottomPanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 2, 5));
 
-        // Fondo del "chip" donde va el porcentaje
         JPanel equityPanel = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
 
-                // Suaviza los bordes para que se vea mejor
                 Graphics2D g2 = (Graphics2D) g;
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-                // Relleno del chip (azulado)
                 g2.setColor(UiTheme.CHIP_FILL);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 20, 20);
 
-                // Borde del chip
                 g2.setColor(UiTheme.CHIP_STROK);
                 g2.setStroke(new BasicStroke(2));
                 g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 20, 20);
@@ -94,9 +101,8 @@ public class PlayerPanel extends JPanel {
         };
         equityPanel.setLayout(new BorderLayout());
         equityPanel.setPreferredSize(new Dimension(120, 30));
-        equityPanel.setOpaque(false); // deja ver el fondo del panel
+        equityPanel.setOpaque(false);
 
-        // Texto del porcentaje centrado dentro del chip
         equityField = new JLabel("0.0%", JLabel.CENTER);
         equityField.setForeground(Color.WHITE);
         equityField.setFont(UiTheme.F_18B);
@@ -104,7 +110,25 @@ public class PlayerPanel extends JPanel {
 
         equityPanel.add(equityField, BorderLayout.CENTER);
         bottomPanel.add(equityPanel);
-        add(bottomPanel, BorderLayout.SOUTH);
+
+        // ---- Fila de acciones (botones)
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+        actions.setOpaque(false);
+        actions.setBorder(BorderFactory.createEmptyBorder(2, 5, 5, 5));
+
+        clearBtn = new JButton("Quitar mano");
+        editBtn  = new JButton("Editar mano");
+
+        clearBtn.addActionListener(e -> { if (onClearHand != null) onClearHand.run(); });
+        editBtn.addActionListener(e  -> { if (onEditHand  != null) onEditHand.run(); });
+
+        actions.add(clearBtn);
+        actions.add(editBtn);
+
+        // Montamos el sur vertical
+        southContainer.add(bottomPanel);
+        southContainer.add(actions);
+        add(southContainer, BorderLayout.SOUTH);
     }
 
     /**
@@ -113,8 +137,8 @@ public class PlayerPanel extends JPanel {
      * Al cambiar las cartas, se repinta el panel para ver las imágenes.
      */
     public void setCards(String cards) {
-        this.cards = cards;
-        cardsPanel.setCards(cards);
+        this.cards = cards == null ? "" : cards;
+        cardsPanel.setCards(this.cards);
         repaint();
     }
 
@@ -146,6 +170,16 @@ public class PlayerPanel extends JPanel {
         equityField.setText("0.0%");
     }
 
+    // ---------- Hooks públicos para conectar desde la GUI principal ----------
+    public void setOnEditHand(Runnable r)  { this.onEditHand  = r; }
+    public void setOnClearHand(Runnable r) { this.onClearHand = r; }
+
+    /** Opcional: habilitar/deshabilitar botones desde fuera */
+    public void setActionsEnabled(boolean enabled) {
+        editBtn.setEnabled(enabled);
+        clearBtn.setEnabled(enabled);
+    }
+
     /**
      * Panel interno que solo se encarga de dibujar las 2 cartas del jugador.
      * Si hay imágenes disponibles (en la carpeta de recursos), las carga y dibuja.
@@ -155,7 +189,7 @@ public class PlayerPanel extends JPanel {
 
         /** Cambia las cartas a dibujar y repinta el panel. */
         public void setCards(String cards) {
-            this.cards = cards;
+            this.cards = cards == null ? "" : cards;
             setBackground(UiTheme.BG_CARD);
             repaint();
         }

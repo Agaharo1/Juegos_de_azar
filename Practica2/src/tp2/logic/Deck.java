@@ -60,20 +60,21 @@ public class Deck {
      * - Quita de ese tramo las que coincidan con la lista 'codes'.
      * - Reinicia el índice para seguir robando desde el principio del tramo limpio.
      */
+ // Reemplaza removeCards por esta versión (opcional):
     public void removeCards(Collection<String> codes) {
         if (codes == null || codes.isEmpty()) return;
 
-        // Se queda con la parte del mazo que aún no se ha usado
-        List<String> remaining = new ArrayList<>(cards.subList(index, cards.size()));
+        List<String> usedPrefix = new ArrayList<>(cards.subList(0, index)); // ya robadas
+        List<String> remaining  = new ArrayList<>(cards.subList(index, cards.size()));
 
-        // Quita de ahí cualquier carta que esté en 'codes' (cartas ya usadas)
         remaining.removeIf(codes::contains);
 
-        // Sustituye el mazo por ese tramo limpio y reinicia la posición
         cards.clear();
+        cards.addAll(usedPrefix);
         cards.addAll(remaining);
-        index = 0;
+        // index permanece igual (seguimos robando donde íbamos)
     }
+
 
     /**
      * Devuelve cuántas cartas quedan por robar.

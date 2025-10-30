@@ -74,4 +74,17 @@ public final class GameState {
     private void ensureSize(int size) {
         while (players.size() < size) players.add(null);
     }
+    
+
+    /** Devuelve la mano del jugador i (puede ser null). */
+    public Hand getPlayerHand(int index) {
+        return players.get(index);
+    }
+
+    /** Limpia la mano del jugador i (pone null). */
+    public void clearPlayerHand(int index) {
+        ensureSize(Math.max(6, index + 1));
+        players.set(index, null);
+    }
+
 }
