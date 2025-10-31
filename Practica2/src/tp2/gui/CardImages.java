@@ -37,7 +37,10 @@ public final class CardImages {
             var url = CardImages.class.getResource("/cartas/" + k + ".png");
 
             // Si no se encuentra la imagen, devuelve null.
-            if (url == null) return null;
+            if (url == null) {
+                System.err.println("No se encontró imagen para: " + k);
+            }
+
 
             // Si se encuentra, la convierte a un objeto de tipo Image.
             return new ImageIcon(url).getImage();

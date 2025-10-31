@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import tp2.logic.HandUtils;
 
 /**
  * Gestiona el ranking de las 169 manos iniciales (aprox. Sklansky)
@@ -81,6 +82,17 @@ public final class RankingProvider {
         }
         return mask;
     }
+    
+    /**
+     * Devuelve true si una mano concreta está dentro del top por porcentaje dado.
+     * Usa HandUtils.to169() para convertir la mano real a su forma textual.
+     */
+    public static boolean isInTopPercent(tp2.model.Hand hand, double percent) {
+        String normalized = HandUtils.to169(hand);
+        List<String> top = getTopByPercent(percent);
+        return top.contains(normalized);
+    }
+
 
     // ======================
     //    FUNCIONES APOYO
