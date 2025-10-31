@@ -7,41 +7,60 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Estado mínimo del juego: manos de jugadores + board + fase.
- * No reparte; solo almacena y valida lo que le pongan.
+ * Estado mínimo del juego: manos de 6 jugadores + board + fase.
+ * Siempre mantiene 6 posiciones (null si el asiento no tiene mano).
  */
 public final class GameState {
     private final List<Hand> players = new ArrayList<>();
     private final Board board = new Board();
     private Phase phase = Phase.PREFLOP;
 
+    /** Crea el estado con 6 slots iniciales en null. */
+    public GameState() {
+        ensureSize(6);
+    }
+
+    /** Vuelve a estado inicial (6 nulls, board vacío, PREFLOP). */
     public void reset() {
         players.clear();
+        ensureSize(6);
         board.clear();
         phase = Phase.PREFLOP;
     }
 
-    /** Define/actualiza la mano de un jugador (por índice). */
+    /** Define/actualiza la mano del jugador 'index' (0..5). Puede ser null. */
     public void setPlayerHand(int index, Hand hand) {
-        ensureSize(index + 1);
+        ensureSize(Math.max(6, index + 1));
         players.set(index, hand);
     }
 
-    /** Acceso inmutable a las manos. */
+    /** Acceso inmutable a la lista de 6 manos (puede contener nulls). */
     public List<Hand> getPlayers() {
         return Collections.unmodifiableList(players);
     }
 
-    public Board getBoard() { return board; }
+    /** Acceso al board (flop/turn/river). */
+    public Board getBoard() {
+        return board;
+    }
 
-    public Phase getPhase() { return phase; }
+    /** Fase actual. */
+    public Phase getPhase() {
+        return phase;
+    }
 
+    /** Establece la fase actual. */
     public void setPhase(Phase p) {
         if (p == null) throw new IllegalArgumentException("Phase no puede ser null");
         this.phase = p;
     }
 
-    /** Devuelve todas las cartas en juego (manos + board) como códigos. */
+    /** Garantiza que hay al menos 'n' posiciones (siempre 6 como mínimo). */
+    public void ensurePlayersCount(int n) {
+        ensureSize(Math.max(6, n));
+    }
+
+    /** Todas las cartas en juego (manos + board) como códigos "Ah","Kd"... */
     public List<String> allUsedCards() {
         List<String> out = new ArrayList<>();
         for (Hand h : players) {
@@ -51,6 +70,7 @@ public final class GameState {
         return out;
     }
 
+    // ---- helpers ----
     private void ensureSize(int size) {
         while (players.size() < size) players.add(null);
     }
