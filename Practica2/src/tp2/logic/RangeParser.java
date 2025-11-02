@@ -72,7 +72,7 @@ public class RangeParser {
         int idxLow = RANKS.indexOf(low);
 
         // Por convenio: misma primera carta, subir la segunda hasta una por debajo de la alta
-        for (int i = idxLow; i < idxHigh; i++) {
+        for (int i = idxLow; i <= idxHigh-1; i++) {
             result.add("" + high + RANKS.charAt(i) + type);
         }
         return result;

@@ -268,11 +268,29 @@ public class PokerEquityGUI extends JFrame {
     private void updateEquities() {
         state.ensurePlayersCount(playerPanels.size());
 
-        List<String> jugadores = new ArrayList<>(playerPanels.size());
-        for (PlayerPanel pp : playerPanels) jugadores.add(pp.getPlayerName());
-
-        List<Hand> manos = state.getPlayers();
+        List<String> allNames = new ArrayList<>();
+        List<Hand> allHands = state.getPlayers();
         List<String> board = state.getBoard().visible();
+
+        // 🎯 Filtrar solo los jugadores activos (que tienen mano)
+        List<String> activeNames = new ArrayList<>();
+        List<Hand> activeHands = new ArrayList<>();
+        List<Integer> activeIndices = new ArrayList<>();
+
+        for (int i = 0; i < allHands.size(); i++) {
+            Hand h = allHands.get(i);
+            if (h != null) { // solo entra si el jugador sigue en la mano
+                activeHands.add(h);
+                activeNames.add(playerPanels.get(i).getPlayerName());
+                activeIndices.add(i);
+            }
+        }
+
+        // Si no hay al menos 2 jugadores activos, no tiene sentido calcular equity
+        if (activeHands.size() < 2) {
+            for (PlayerPanel pp : playerPanels) pp.setEquity(0.0);
+            return;
+        }
 
         int trials = switch (phase) {
             case PREFLOP -> 5000;
@@ -281,18 +299,24 @@ public class PokerEquityGUI extends JFrame {
             case RIVER   -> 1;
         };
 
-        String seedKey = String.join("-", jugadores) + "|" + manos + "|" + board + "|" + phase;
+        String seedKey = String.join("-", activeNames) + "|" + activeHands + "|" + board + "|" + phase;
         long seed = seedKey.hashCode();
 
-        Map<String, Double> equities = calc.calcularEquity(jugadores, manos, board, trials, seed);
+        Map<String, Double> equities = calc.calcularEquity(activeNames, activeHands, board, trials, seed);
 
+        // ✅ Aplicar resultados solo a los jugadores activos
         for (int i = 0; i < playerPanels.size(); i++) {
             PlayerPanel pp = playerPanels.get(i);
-            String name = jugadores.get(i);
-            Double eq = equities.getOrDefault(name, 0.0);
-            pp.setEquity(eq);
+            if (activeIndices.contains(i)) {
+                String name = playerPanels.get(i).getPlayerName();
+                Double eq = equities.getOrDefault(name, 0.0);
+                pp.setEquity(eq);
+            } else {
+                pp.setEquity(0.0); // los que han hecho fold
+            }
         }
     }
+
 
     private void syncDeckAfterChange() {
         if (deck != null) {
@@ -413,7 +437,7 @@ public class PokerEquityGUI extends JFrame {
                 }
             } else {
                 int pct = heroPanel.getPercentage();
-                List<String> top = RankingProvider.getTopByPercent(pct / 100.0);
+                List<String> top = RankingProvider.getTopByPercent(pct);
                 if (top.isEmpty()) {
                     JOptionPane.showMessageDialog(PokerEquityGUI.this,
                             "Porcentaje demasiado bajo.",
@@ -424,24 +448,33 @@ public class PokerEquityGUI extends JFrame {
             }
 
             try {
-                List<String> manos = tp2.logic.RangeParser.parse(rango);
-                Random rand = new Random();
-                String manoElegida = manos.get(rand.nextInt(manos.size()));
-                String cartasConcretas = generarCartasConcretasDesdeNotacion(manoElegida);
-
                 PlayerPanel hero = playerPanels.get(4);
-                hero.setCards(cartasConcretas);
-                state.setPlayerHand(4, Hand.fromString(cartasConcretas));
+                Hand hand = state.getPlayers().get(4); // mano actual del héroe
 
-                if (deck != null) deck.removeCards(state.allUsedCards());
+                if (hand == null) {
+                    JOptionPane.showMessageDialog(PokerEquityGUI.this,
+                            "El héroe no tiene una mano repartida todavía.",
+                            "Sin mano", JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
 
-                updateEquities();
-                statusBar.setMessage("Héroe fijado desde rango.");
-                statusBar.setRight("Mazo restante: " + (deck != null ? deck.remaining() : 0));
+                boolean enRango;
+                if (heroPanel.isTextualSelected()) {
+                    String normalizada = tp2.logic.HandUtils.to169(hand);
+                    enRango = RangeParser.parse(rango).contains(normalizada);
+                } else {
+                    int pct = heroPanel.getPercentage();
+                    enRango = RankingProvider.isInTopPercent(hand, pct);
+                }
+
+                // ✅ Solo colorea, no cambia la mano
+                hero.setBackground(enRango ? new Color(0, 130, 0) : new Color(130, 0, 0));
+                hero.repaint();
 
                 JOptionPane.showMessageDialog(PokerEquityGUI.this,
-                        "Héroe: " + manoElegida + " \u2192 " + cartasConcretas,
-                        "Rango aplicado",
+                        "Tu mano: " + hand.toString() + "\n" +
+                        (enRango ? "✅ Está dentro del rango." : "❌ Está fuera del rango."),
+                        "Resultado de comprobación",
                         JOptionPane.INFORMATION_MESSAGE);
 
             } catch (Exception ex) {
@@ -450,6 +483,7 @@ public class PokerEquityGUI extends JFrame {
                         "Error", JOptionPane.ERROR_MESSAGE);
             }
         }
+
 
         private String generarCartasConcretasDesdeNotacion(String notacion) {
             String[] palos = {"h", "d", "c", "s"};
@@ -513,6 +547,7 @@ public class PokerEquityGUI extends JFrame {
             tablePanel.repaint();
 
             updateButtonsState();
+            playerPanels.get(4).setBackground(UiTheme.BG_CARD);
             updateEquities();
 
             statusBar.setMessage("Cartas repartidas. Fase: PREFLOP");
@@ -593,7 +628,11 @@ public class PokerEquityGUI extends JFrame {
             deck = null;
 
             tablePanel.repaint();
-            for (PlayerPanel pp : playerPanels) pp.reset();
+            for (PlayerPanel pp : playerPanels) {
+                pp.reset();
+                pp.setBackground(UiTheme.BG_CARD); // 🔄 Restablece el color original
+            }
+
 
             updateButtonsState();
 

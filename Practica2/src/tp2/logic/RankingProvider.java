@@ -61,6 +61,9 @@ public final class RankingProvider {
      *  - p <= 0    → devuelve lista vacía.
      */
     public static List<String> getTopByPercent(double p) {
+    	if (p > 100) p = 100;
+    	if (p > 1) p /= 100.0;
+
         int k = Math.min(RANKING_169.length, Math.max(0, (int)Math.ceil(RANKING_169.length * p)));
         if (k == 0) return Collections.emptyList();
         ArrayList<String> top = new ArrayList<>(k);
@@ -76,7 +79,7 @@ public final class RankingProvider {
      */
     public static boolean[][][] getMaskForPercent(double percent) {
         boolean[][][] mask = new boolean[13][13][2];
-        int limit = Math.min(RANKING_169.length, (int)Math.round(RANKING_169.length * percent));
+        int limit = Math.min(RANKING_169.length, (int)Math.ceil(RANKING_169.length * percent));
         for (int i = 0; i < limit; i++) {
             mark(mask, RANKING_169[i]);
         }
