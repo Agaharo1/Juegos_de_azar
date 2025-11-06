@@ -1,10 +1,10 @@
 package tp2.model;
 
-import tp2.gui.Phase;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+
+import tp2.gui.Phase;
 
 /**
  * Estado mínimo del juego: manos de 6 jugadores + board + fase.
@@ -14,6 +14,7 @@ public final class GameState {
     private final List<Hand> players = new ArrayList<>();
     private final Board board = new Board();
     private Phase phase = Phase.PREFLOP;
+    private final List<String> foldedCards = new ArrayList<>();
 
     /** Crea el estado con 6 slots iniciales en null. */
     public GameState() {
@@ -26,6 +27,7 @@ public final class GameState {
         ensureSize(6);
         board.clear();
         phase = Phase.PREFLOP;
+        foldedCards.clear();
     }
 
     /** Define/actualiza la mano del jugador 'index' (0..5). Puede ser null. */
@@ -68,6 +70,18 @@ public final class GameState {
         }
         out.addAll(board.visible());
         return out;
+    }
+    
+    public List<String> getFoldedCards() {
+        return Collections.unmodifiableList(foldedCards);
+    }
+
+    public void addFoldedHand(Hand hand) {
+        if (hand != null) foldedCards.addAll(hand.asList());
+    }
+
+    public void clearFoldedCards() {
+        foldedCards.clear();
     }
 
     // ---- helpers ----

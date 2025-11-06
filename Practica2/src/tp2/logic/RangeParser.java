@@ -1,6 +1,9 @@
 package tp2.logic;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
 
 /**
  * RangeParser amplía el soporte de rangos textuales.

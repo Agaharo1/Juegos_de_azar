@@ -1,6 +1,10 @@
 package tp2.logic;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Evaluador claro y didáctico (como en la práctica anterior):
@@ -205,22 +209,17 @@ public final class PokerHandEvaluator {
 
     // ===== Empaquetado a long comparable (categoría + kickers) =====
 
-    // Mantenemos el mismo esquema de “bits” que tenías: 8 categorías y 5 kickers (5 bits por kicker).
-    // Category ordinal ya está 0..8 en orden ascendente (HIGH_CARD..STRAIGHT_FLUSH).
     private static long pack(HandResult r) {
         long v = ((long) r.category.ordinal()) << 40;
-        long shift = 0;
-        // Máximo 5 números de desempate
-        for (int i = 0; i < 5; i++) {
+        final int MAX = 5; // hasta 5 componentes de desempate
+        for (int i = 0; i < MAX; i++) {
             int x = (i < r.tie.length) ? r.tie[i] : 0;
+            int shift = (MAX - 1 - i) * 5;   // <<— ¡clave! el más alto, más significativo
             v |= ((long) (x & 0x1F)) << shift;
-            shift += 5;
         }
-        // Nota: Si quisieras distinguir “royal” de “straight-flush A-alto” para empatar,
-        // podrías sumar un bit extra, pero no es necesario en Texas Hold’em:
-        // ambos son la misma categoría y mismo high (A).
         return v;
     }
+
 
     // ===== Utilidades de evaluación claras =====
 

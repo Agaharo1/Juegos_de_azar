@@ -1,9 +1,24 @@
 package tp2.gui;
 
-import javax.swing.*;
-import javax.swing.border.EmptyBorder;
-import java.awt.*;
+import java.awt.BasicStroke;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Image;
+import java.awt.Insets;
+import java.awt.RenderingHints;
 import java.util.Locale;
+
+import javax.swing.BorderFactory;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.border.EmptyBorder;
 
 public class PlayerPanel extends JPanel {
     private final String playerName;
@@ -107,7 +122,7 @@ public class PlayerPanel extends JPanel {
     public String getCards() { return cards; }
 
     public void setEquity(double pct) {
-        equityField.setText(String.format(Locale.ROOT, "%.1f%%", pct));
+        equityField.setText(String.format(Locale.ROOT, "%.3f%%", pct));
     }
 
     public String getPlayerName() { return playerName; }

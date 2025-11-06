@@ -1,10 +1,10 @@
 package tp2.model;
 
-import tp2.gui.Phase;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+
+import tp2.gui.Phase;
 
 /**
  * Board de 5 posiciones: flop[0..2], turn[3], river[4].

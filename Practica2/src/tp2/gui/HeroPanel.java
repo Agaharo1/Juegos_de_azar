@@ -1,9 +1,22 @@
 package tp2.gui;
 
-import javax.swing.*;
-import javax.swing.border.*;
-import java.awt.*;
+import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.event.ItemListener;
+
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.ButtonGroup;
+import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JRadioButton;
+import javax.swing.JSpinner;
+import javax.swing.JTextField;
+import javax.swing.SpinnerNumberModel;
+import javax.swing.border.EmptyBorder;
 /**
  * Panel de controles del "héroe" (el jugador principal).
  * Aquí el usuario elige cómo definir su rango (texto o porcentaje),

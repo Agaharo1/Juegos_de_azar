@@ -1,7 +1,9 @@
 package tp2.logic;
 
+import java.util.List;
+import java.util.Map;
+
 import tp2.model.Hand;
-import java.util.*;
 
 public class PokerStoveEquityCalculator implements EquityCalculator {
     @Override

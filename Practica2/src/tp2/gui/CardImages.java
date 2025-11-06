@@ -1,8 +1,10 @@
 package tp2.gui;
 
-import javax.swing.*;
-import java.awt.*;
-import java.util.*;
+import java.awt.Image;
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.swing.ImageIcon;
 
 /**
  * Esta clase se encarga de cargar y guardar las imágenes de las cartas.

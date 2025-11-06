@@ -1,11 +1,21 @@
 package tp2.gui;
 
-import tp2.model.Hand;
-
-import javax.swing.*;
-import java.awt.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.Window;
 import java.util.function.Consumer;
 import java.util.function.Function;
+
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JDialog;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JTextField;
+
+import tp2.model.Hand;
 
 /**
  * Diálogo para editar manualmente la mano de un jugador.

@@ -1,7 +1,10 @@
 package tp2.gui;
 
-import javax.swing.*;
-import java.awt.*;
+import java.awt.BorderLayout;
+
+import javax.swing.BorderFactory;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
 
 public class StatusBar extends JPanel {
     private final JLabel left = new JLabel("Listo.");

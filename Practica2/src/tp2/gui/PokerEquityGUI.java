@@ -1,19 +1,43 @@
 package tp2.gui;
 
-import javax.swing.*;
-import javax.swing.border.*;
-import java.awt.*;
-import java.awt.event.*;
-import java.util.*;
+import java.awt.BasicStroke;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Image;
+import java.awt.RenderingHints;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Random;
+import java.util.Set;
+
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.SwingUtilities;
+import javax.swing.border.CompoundBorder;
+import javax.swing.border.EmptyBorder;
 
 import tp2.logic.Deck;
-import tp2.logic.RangeParser;
-import tp2.logic.RankingProvider;
 import tp2.logic.EquityCalculator;
 import tp2.logic.PokerStoveEquityCalculator;
-
+import tp2.logic.RangeParser;
+import tp2.logic.RankingProvider;
 import tp2.model.GameState;
 import tp2.model.Hand;
 
@@ -293,9 +317,9 @@ public class PokerEquityGUI extends JFrame {
         }
 
         int trials = switch (phase) {
-            case PREFLOP -> 5000;
-            case FLOP    -> 15000;
-            case TURN    -> 30000;
+            case PREFLOP -> 100000;
+            case FLOP    -> 200000;
+            case TURN    -> 300000;
             case RIVER   -> 1;
         };
 
@@ -320,10 +344,13 @@ public class PokerEquityGUI extends JFrame {
 
     private void syncDeckAfterChange() {
         if (deck != null) {
-            deck.removeCards(state.allUsedCards());
+            List<String> used = new ArrayList<>(state.allUsedCards());
+            used.addAll(state.getFoldedCards());
+            deck.removeCards(used);
             statusBar.setRight("Mazo restante: " + deck.remaining());
         }
     }
+
 
     private Hand stateGetPlayerHand(int i) {
         try { return state.getPlayers().get(i); }
@@ -392,13 +419,22 @@ public class PokerEquityGUI extends JFrame {
     }
 
     private void quitarMano(int seat) {
+        Hand hand = stateGetPlayerHand(seat);
+        if (hand != null) {
+            state.addFoldedHand(hand);
+        }
+
         state.setPlayerHand(seat, null);
         playerPanels.get(seat).setCards("");
+
         syncDeckAfterChange();
         updateEquities();
         tablePanel.repaint();
-        statusBar.setMessage("Mano quitada en jugador " + (seat + 1));
+
+        playerPanels.get(seat).setBackground(new Color(50, 50, 50));
+        statusBar.setMessage("Jugador " + (seat + 1) + " ha hecho fold.");
     }
+
 
     // =========================
     //   Controlador de botones

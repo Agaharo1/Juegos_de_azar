@@ -1,6 +1,7 @@
 package tp2.gui;
 
-import java.awt.*;
+import java.awt.Color;
+import java.awt.Font;
 
 public final class UiTheme {
     private UiTheme() {}

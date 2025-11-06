@@ -1,11 +1,25 @@
 package tp2.gui;
 
-import tp2.model.*;
-import tp2.logic.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.FlowLayout;
+import java.awt.Frame;
+import java.awt.GridLayout;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 
-import javax.swing.*;
-import java.awt.*;
-import java.util.*;
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JDialog;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JTextField;
+
+import tp2.logic.Deck;
+import tp2.model.Board;
+import tp2.model.CardValidator;
+import tp2.model.GameState;
 
 public class BoardEditorDialog extends JDialog {
     private final GameState state;
