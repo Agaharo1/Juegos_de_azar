@@ -122,7 +122,7 @@ public class PlayerPanel extends JPanel {
     public String getCards() { return cards; }
 
     public void setEquity(double pct) {
-        equityField.setText(String.format(Locale.ROOT, "%.1f%%", pct));
+        equityField.setText(String.format(Locale.ROOT, "%.3f%%", pct));
     }
 
     public String getPlayerName() { return playerName; }
