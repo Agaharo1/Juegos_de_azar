@@ -27,7 +27,7 @@ import java.util.Set;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JFrame;
-import javax.swing.JOptionPane;
+import javax.swing.JOptionPane; 
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import javax.swing.border.CompoundBorder;
@@ -139,7 +139,7 @@ public class PokerEquityGUI extends JFrame {
                 };
 
                 // Board
-                int cardW = 95, cardH = 140, spacing = 30;
+                int cardW = 95, cardH = 150, spacing = 30;
                 int totalWidth = show * cardW + (show - 1) * spacing;
                 int startX = centerX - totalWidth / 2;
                 int y = centerY - cardH / 2;
@@ -177,12 +177,50 @@ public class PokerEquityGUI extends JFrame {
         });
 
         playerPanels = new ArrayList<>();
-        String[] names = {"Player 1", "Player 2", "Player 3", "Player 4", "Player 5", "Player 6"};
+        String[] names = {"Button", "Small Blind", "Big Blind", "UTG", "Highjack", "Cut-off"};
+        
         for (int i = 0; i < 6; i++) {
-            PlayerPanel pp = new PlayerPanel(names[i], i == 4);
+            PlayerPanel pp = new PlayerPanel(names[i], i == 4); 
             final int seat = i;
             pp.setOnEditHand(() -> abrirEditorMano(seat));
             pp.setOnClearHand(() -> quitarMano(seat));
+            
+            // Callback para RANGO
+            pp.setOnEditRange(() -> {
+                String rangoActual = pp.getRangeInput();
+                String nuevoRango = (String) JOptionPane.showInputDialog(
+                        PokerEquityGUI.this, 
+                        "Introduce el Rango (ej: AA,KK+ o 70%):", 
+                        "Editar Rango - " + pp.getPlayerName(), 
+                        JOptionPane.PLAIN_MESSAGE,
+                        null,
+                        null,
+                        rangoActual 
+                );
+
+                if (nuevoRango != null) { 
+                    pp.setRangeText(nuevoRango.trim());
+                }
+            });
+
+            // Callback para EM
+            pp.setOnEditEM(() -> {
+                String emActual = pp.getEMInput();
+                String nuevoEM = (String) JOptionPane.showInputDialog(
+                        PokerEquityGUI.this, 
+                        "Introduce el Equity Mínimo (ej: 25% o 25):", 
+                        "Editar EM - " + pp.getPlayerName(), 
+                        JOptionPane.PLAIN_MESSAGE,
+                        null,
+                        null,
+                        emActual 
+                );
+
+                if (nuevoEM != null) { 
+                    pp.setEMText(nuevoEM.trim().replace("%", ""));
+                }
+            });
+
             playerPanels.add(pp);
             tablePanel.add(pp);
         }
@@ -195,7 +233,8 @@ public class PokerEquityGUI extends JFrame {
         int centerX = w / 2, centerY = h / 2;
         int rx = (int)(w * 0.40), ry = (int)(h * 0.35);
 
-        int panelW = 160, panelH = 200;
+        int panelW = 160, panelH = 260; 
+        
         double offset = Math.PI * 0.5;
 
         for (int i = 0; i < playerPanels.size(); i++) {
@@ -666,7 +705,7 @@ public class PokerEquityGUI extends JFrame {
             tablePanel.repaint();
             for (PlayerPanel pp : playerPanels) {
                 pp.reset();
-                pp.setBackground(UiTheme.BG_CARD); // 🔄 Restablece el color original
+                pp.setBackground(UiTheme.BG_CARD); 
             }
 
 
