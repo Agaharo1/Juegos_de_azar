@@ -1,1 +1,61 @@
-/bin/
+#############################
+# Eclipse workspace files
+#############################
+.classpath
+.project
+.settings/
+
+#############################
+# Build output (auto-generated)
+#############################
+bin/
+build/
+out/
+target/
+
+#############################
+# NetBeans (por si alguien usa)
+#############################
+nbproject/private/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+#############################
+# Logs / temp / OS files
+#############################
+*.log
+*.tmp
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+#############################
+# Compiled files
+#############################
+*.class
+*.jar
+*.war
+*.ear
+
+#############################
+# Backup files
+#############################
+*~
+*.bak
+
+#############################
+# IDE config files (otros)
+#############################
+*.iml
+.idea/
+.vscode/
+
+#############################
+# Libs externas (opcional)
+# Si tenéis una carpeta lib/ con .jar que SÍ queréis subir,
+# entonces comenta la línea de abajo.
+#############################
+# lib/
