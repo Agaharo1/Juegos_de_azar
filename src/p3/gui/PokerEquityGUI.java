@@ -35,6 +35,7 @@ import javax.swing.border.EmptyBorder;
 
 import p3.logic.Deck;
 import p3.logic.EquityCalculator;
+import p3.logic.HandUtils;
 import p3.logic.PokerStoveEquityCalculator;
 import p3.logic.RangeParser;
 import p3.logic.RankingProvider;
@@ -378,6 +379,98 @@ public class PokerEquityGUI extends JFrame {
                 pp.setEquity(0.0); // los que han hecho fold
             }
         }
+        
+     // =============================
+    //  VALIDACIÓN DE RANGOS + EM
+    // =============================
+    for (int i = 0; i < playerPanels.size(); i++) {
+
+        PlayerPanel pp = playerPanels.get(i);
+        Hand hand = state.getPlayers().get(i);
+
+        if (hand == null) {
+            // Sin mano → gris neutro
+            pp.setBackground(UiTheme.BG_CARD);
+            continue;
+        }
+
+        // --- Equity del jugador ---
+        double equityJugador;
+        try {
+            String name = pp.getPlayerName();
+            equityJugador = equities.getOrDefault(name, 0.0);
+        } catch (Exception ex) {
+            equityJugador = 0.0;
+        }
+
+     // --- Equity Mínimo (EM) ---
+        String raw = pp.getEMInput().replace("%", "").trim();
+
+        boolean tieneEM = !raw.isEmpty();
+        double em = 0.0;
+
+        if (tieneEM) {
+            try {
+                em = Double.parseDouble(raw);
+            } catch (Exception ex) {
+                em = 0.0; // si algo está mal escrito, lo tratamos como 0
+            }
+        }
+
+        // El equityJugador está en 0–100, NO se multiplica por 100
+        boolean cumpleEM = (!tieneEM) || (equityJugador >= em);
+
+
+        // --- Determinar Rango ---
+        String rangoRaw = pp.getRangeInput().trim();
+        boolean enRango = false;
+
+        if (!rangoRaw.isEmpty()) {
+
+            if (rangoRaw.endsWith("%")) {
+                // % PORCENTAJE
+                try {
+                    String pctTxt = rangoRaw.replace("%", "").trim();
+                    double pct = Double.parseDouble(pctTxt);
+                    enRango = RankingProvider.isInTopPercent(hand, pct);
+                } catch (Exception ignore) {
+                    enRango = false;
+                }
+
+            } else if (rangoRaw.matches("\\d+")) {
+                // Número  → interpretarlo como porcentaje
+                try {
+                    double pct = Double.parseDouble(rangoRaw);
+                    enRango = RankingProvider.isInTopPercent(hand, pct);
+                } catch (Exception ignore) {
+                    enRango = false;
+                }
+
+            } else {
+                // RANGO TEXTUAL
+                try {
+                	String h169 = p3.logic.HandUtils.to169(hand).toUpperCase(Locale.ROOT);
+                	List<String> parsed = RangeParser.parse(rangoRaw.toUpperCase(Locale.ROOT));
+                	enRango = parsed.contains(h169);
+                } catch (Exception ignore) {
+                    enRango = false;
+                }
+            }
+        }
+
+        // --- Colores ---
+        boolean ok = enRango && cumpleEM;
+
+        Color good = new Color(0, 130, 0);
+        Color bad  = new Color(130, 0, 0);
+
+        if (rangoRaw.isEmpty() && pp.getEMInput().isBlank()) {
+            pp.setBackground(UiTheme.BG_CARD);
+        } else {
+            pp.setBackground(ok ? good : bad);
+        }
+    }
+
     }
 
 
@@ -535,8 +628,9 @@ public class PokerEquityGUI extends JFrame {
 
                 boolean enRango;
                 if (heroPanel.isTextualSelected()) {
-                    String normalizada = p3.logic.HandUtils.to169(hand);
-                    enRango = RangeParser.parse(rango).contains(normalizada);
+                	String normalizada = HandUtils.to169(hand).toUpperCase(Locale.ROOT);
+                	enRango = RangeParser.parse(rango.toUpperCase(Locale.ROOT)).contains(normalizada);
+
                 } else {
                     int pct = heroPanel.getPercentage();
                     enRango = RankingProvider.isInTopPercent(hand, pct);
