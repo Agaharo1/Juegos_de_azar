@@ -1,1 +1,9 @@
-/bin/
+/build/
+/dist/
+/nbproject/private/
+/out/
+*.class
+.classpath
+.project
+.settings/
+*.iml
