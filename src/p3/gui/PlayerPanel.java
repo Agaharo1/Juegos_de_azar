@@ -227,9 +227,7 @@ public class PlayerPanel extends JPanel {
 
     public String getCards() { return cards; }
 
-    public void setEquity(double pct) {
-        equityField.setText(String.format(Locale.ROOT, "%.3f%%", pct));
-    }
+
 
     public String getPlayerName() { return playerName; }
 
@@ -303,4 +301,47 @@ public class PlayerPanel extends JPanel {
             }
         }
     }
+    
+    
+ 
+    public void setRangeStatus(Boolean status) {
+        if (rangeField == null) return;
+        if (status == null) {
+            rangeField.setBackground(UiTheme.BG_INPUT); 
+        } else {
+            rangeField.setBackground(status ? new Color(0, 130, 0) : new Color(130, 0, 0));
+        }
+    }
+
+
+    public void setEMStatus(Boolean status) {
+        if (emField == null) return;
+        if (status == null) {
+            emField.setBackground(UiTheme.BG_INPUT); 
+        } else {
+            emField.setBackground(status ? new Color(0, 130, 0) : new Color(130, 0, 0));
+        }
+    }
+    
+ 
+    public void setEquityText(String text) {
+        equityField.setText(text);
+        
+        
+        if (text != null && text.length() > 10) {
+            equityField.setFont(UiTheme.F_9);
+        } else {
+            equityField.setFont(UiTheme.F_18B); 
+        }
+    }
+
+ 
+    public void setEquity(double pct) {
+        equityField.setFont(UiTheme.F_18B); 
+        equityField.setText(String.format(Locale.ROOT, "%.3f%%", pct));
+    }
 }
+
+
+
+
