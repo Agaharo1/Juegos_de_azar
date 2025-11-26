@@ -37,7 +37,7 @@ public class TurnDecisionDialog extends JDialog {
         form.add(txtBoard);
         
         form.add(new JLabel("Equity Mínimo (EM) %:"));
-        txtEM = new JTextField("30"); // Ejemplo del PDF
+        txtEM = new JTextField("30"); // Ejemplo típico del PDF
         form.add(txtEM);
 
         JButton btnCalc = new JButton("Calcular Outs y Decisión");
@@ -77,28 +77,23 @@ public class TurnDecisionDialog extends JDialog {
             board.add(bText.substring(4, 6));
             board.add(bText.substring(6, 8));
             
-            double em = Double.parseDouble(txtEM.getText().trim());
+            double emPct = Double.parseDouble(txtEM.getText().trim());
 
-            // LLAMADA A LA LÓGICA (Issue #36)
+            // 1) Media de outs contra el rango del villano
             double avgOuts = TurnDecisionLogic.calculateAverageOuts(hero, range, board);
-            
-            lblOuts.setText(String.format("Media Outs: %.2f", avgOuts));
 
-            // Decisión: Call si Media > EM (Nota: el enunciado dice "si la media obtenida es mayor al EM... hero hará Call" [cite: 290, 302])
-            // Pero ojo: EM suele ser porcentaje (30%) y outs es número (4). 
-            // El ejemplo del PDF [cite: 302] compara outs directas vs un % de EM convertido a outs? 
-            // No, dice: "EM 30%... media 35.71 outs... debería hacer Call".
-            // CUIDADO: 35.71 outs es imposible (max 44 o 46). 
-            // El ejemplo del PDF [cite: 302] dice: "Media = 35.71 outs" (probablemente se refiere a equity % o outs ponderadas).
-            // Sin embargo, para la práctica, asumiremos que si el usuario mete EM como %, debemos convertir las outs a %.
-            // Equity aprox = (Outs * 2) + 2 (regla 4 y 2) o simplemente (Outs / 44 cartas) * 100.
-            
-            double equityEstimada = (avgOuts / 44.0) * 100; 
-            
-            // Ajustamos la etiqueta para mostrar ambos datos
-            lblOuts.setText(String.format("Outs: %.2f (Eq: %.1f%%)", avgOuts, equityEstimada));
-            
-            if (equityEstimada >= em) {
+            // 2) Convertir EM% en "outs objetivo" (44 cartas posibles en river)
+            double minOuts = (emPct / 100.0) * 44.0;
+
+            // 3) Equity aproximada a partir de las outs (para mostrar al usuario)
+            double equityEstimada = (avgOuts / 44.0) * 100.0;
+
+            lblOuts.setText(String.format(
+                    "Outs media: %.2f  |  Eq≈ %.1f%% (EM %.1f%% → %.2f outs)",
+                    avgOuts, equityEstimada, emPct, minOuts));
+
+            // Decisión: CALL si la media de outs supera el equivalente a EM%
+            if (avgOuts >= minOuts) {
                 lblDecision.setText("CALL");
                 lblDecision.setForeground(Color.GREEN.darker());
             } else {
