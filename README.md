@@ -1,13 +1,21 @@
+<<<<<<< HEAD
 # Proyecto: Juegos de Azar 🎲♠️♥️♣️♦️
 
 Este repositorio contiene el desarrollo del **calculador de equity de póker Texas Hold’em** realizado en **Java**, estructurado bajo el patrón **MVC (Modelo-Vista-Controlador)** con una interfaz gráfica en **Swing**.
 Su objetivo es ofrecer una aplicación visual que simule partidas de Texas Hold’em, mostrando las cartas de los jugadores y del board, y calculando las **probabilidades reales de ganar (equity)** mediante **simulación Monte Carlo**.
+=======
+# Proyecto: Juegos de Azar - Práctica 3 🎲♠️♥️♣️♦️
+
+Este repositorio contiene el desarrollo de la **Práctica 3** de la asignatura *Herramientas Informáticas para Juegos de Azar*, centrada en la **toma de decisiones en el póker Texas Hold’em**.  
+El proyecto está desarrollado en **Java**, bajo el patrón **MVC (Modelo–Vista–Controlador)**, e implementa una interfaz gráfica en **Swing**.
+>>>>>>> feature/alberto
 
 ---
 
 ## 📂 Estructura general del proyecto
 
 ```bash
+<<<<<<< HEAD
 Practica2/
 ├── src/
 │   └── tp2/
@@ -16,6 +24,14 @@ Practica2/
 │       ├── logic/    # Lógica de cálculo (Deck, EquityCalculator, Evaluador, etc.)
 │       ├── model/    # Representación del estado del juego (Manos, Board, GameState)
 │       └── parse/    # Parsers y utilidades de notación de rangos
+=======
+HJA/
+├── src/
+│   └── tp3/
+│       ├── gui/      # Interfaz gráfica (Swing)
+│       ├── logic/    # Lógica del juego (equity, decisiones, evaluador, etc.)
+│       ├── model/    # Estado del juego (jugadores, manos, board, fases)
+>>>>>>> feature/alberto
 │
 ├── resources/
 │   └── cartas/       # Imágenes PNG de las cartas (Ah.png, Kd.png, etc.)
@@ -28,6 +44,7 @@ Practica2/
 
 ---
 
+<<<<<<< HEAD
 ## 🌿 Estructura de ramas
 
 | Rama              | Propósito                                                         | Estado         |
@@ -161,6 +178,96 @@ El **RealEquityCalculator** estima las probabilidades reales de victoria:
 * **Flujo:** `feature → dev → main`
 * **.gitignore:**
 
+=======
+## 🧱 Arquitectura (MVC)
+
+### 🖥️ Vista (`tp3.gui`)
+
+* `PokerEquityGUI`: ventana principal del juego, con tablero, jugadores y control de fases.
+* `HeroPanel`: controles del jugador principal (rango, porcentaje, equity mínimo).
+* `PlayerPanel`: muestra nombre, cartas, equity y acción (Bet, Call, Fold).
+* `StatusBar`: muestra información contextual (fase, cartas restantes, acciones).
+* `UiTheme` y `CardImages`: definen los colores, tipografía y carga de imágenes.
+
+### ⚙️ Lógica (`tp3.logic`)
+
+* `PokerHandEvaluator`: evalúa la fuerza de manos de 7 cartas.
+* `RealEquityCalculator`: calcula la **equity real** mediante simulación Monte Carlo.
+* `RangeParser` y `RankingProvider`: interpretan rangos y rankings por porcentaje.
+* `DecisionEngine`: nuevo módulo para determinar acciones (Bet, Call, Fold) en base a equity mínima.
+* `RoundManager`: gestiona las fases del juego y las decisiones automáticas.
+* `OutsCalculator`: calcula **outs medios** contra el rango de un rival.
+
+### 📊 Modelo (`tp3.model`)
+
+* `Hand`: representa una mano de dos cartas.
+* `Board`: representa las cartas comunes (flop, turn, river).
+* `GameState`: estado general del juego (jugadores activos, board y fase).
+* `Phase`: enum con las fases (`PREFLOP`, `FLOP`, `TURN`, `RIVER`).
+* `CardValidator`: valida el formato de las cartas.
+
+---
+
+## ⚙️ Funcionamiento general
+
+1. **Inicialización (Deal):**
+   - Se reparten las manos de los jugadores.
+   - Se genera el board de forma aleatoria o manual.
+   - Se calcula la **equity inicial** de cada jugador.
+
+2. **Simulación de fases:**
+   - Cada fase (Flop, Turn, River) actualiza el board y recalcula el equity.
+   - El estado del mazo y los jugadores se sincroniza con `GameState`.
+
+3. **Toma de decisiones (Novedad en Práctica 3):**
+   - Cada jugador tiene un **rango** y un **equity mínimo (EM)**.
+   - Si la mano está dentro del rango y el equity ≥ EM → **Bet/Call**.
+   - Si no cumple las condiciones → **Fold**.
+   - En el **Turn**, se calcula la media de outs contra el rango rival para decidir.
+
+4. **Actualización visual:**
+   - La GUI refleja automáticamente las acciones y el estado del juego.
+
+---
+
+## ⚙️ Compilación y ejecución
+
+**Compilación manual:**
+```bash
+javac -d bin -sourcepath src src/tp3/gui/PokerEquityGUI.java
+```
+
+**Ejecución:**
+```bash
+java -cp bin tp3.gui.PokerEquityGUI
+```
+
+**Recursos:**
+Asegúrate de copiar las imágenes de cartas:
+```bash
+xcopy resources\cartas bin\cartas /E /I /Y
+```
+
+---
+
+## 🧠 Próximos pasos
+
+* 🧮 Implementar el cálculo de outs medios (Turn vs rango).
+* 🧠 Ampliar la toma de decisiones con factores de riesgo y pot odds.
+* 🧪 Crear tests unitarios con JUnit 5.
+* 💾 Guardar configuraciones de usuario (rango, equity mínima).
+* 🚀 Optimizar el simulador con hilos (multithreading).
+
+---
+
+## 📘 Entorno de desarrollo
+
+* **Lenguaje:** Java 17  
+* **Entorno:** Eclipse IDE  
+* **Gestor de versiones:** Git + GitHub  
+* **Flujo de trabajo:** `feature → dev → main`  
+* **.gitignore:**
+>>>>>>> feature/alberto
   ```
   .idea/ .vscode/ *.iml
   .project
@@ -173,8 +280,15 @@ El **RealEquityCalculator** estima las probabilidades reales de victoria:
 
 ---
 
+<<<<<<< HEAD
 ## 🧠 Nota final
 
 > 💬 **Importante:**
 > La versión actual en `main` implementa el **cálculo real de equity** con simulación Monte Carlo, el **evaluador completo de manos de 7 cartas** y una interfaz totalmente funcional.
 > Las ramas `feature/*` se utilizarán para ampliar funcionalidades y optimizaciones futuras. 🚀
+=======
+## ✉️ Nota final
+
+> Este proyecto corresponde a la **Práctica 3**, centrada en la automatización de decisiones y simulación de estrategias en Texas Hold’em.  
+> La base de cálculo de equity se hereda de la práctica anterior, pero el foco actual está en la toma de decisiones y la integración de la inteligencia básica de juego.
+>>>>>>> feature/alberto

@@ -1,8 +1,10 @@
-package tp2.gui;
+package p3.gui;
 
-import javax.swing.*;
-import java.awt.*;
-import java.util.*;
+import java.awt.Image;
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.swing.ImageIcon;
 
 /**
  * Esta clase se encarga de cargar y guardar las imágenes de las cartas.
@@ -36,15 +38,11 @@ public final class CardImages {
             // Busca la imagen dentro del proyecto (en /resources/cartas/)
             var url = CardImages.class.getResource("/cartas/" + k + ".png");
 
-            // Si no se encuentra la imagen, devuelve null.
-<<<<<<< HEAD
-            if (url == null) return null;
-=======
+            // Si no se encuentra la imagen, devolvemos null y avisamos.
             if (url == null) {
                 System.err.println("No se encontró imagen para: " + k);
+                return null;
             }
-
->>>>>>> feature/alberto
 
             // Si se encuentra, la convierte a un objeto de tipo Image.
             return new ImageIcon(url).getImage();

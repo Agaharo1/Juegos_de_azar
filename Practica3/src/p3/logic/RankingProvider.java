@@ -1,13 +1,9 @@
-package tp2.logic;
+package p3.logic;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-<<<<<<< HEAD
-=======
-import tp2.logic.HandUtils;
->>>>>>> feature/alberto
 
 /**
  * Gestiona el ranking de las 169 manos iniciales (aprox. Sklansky)
@@ -64,12 +60,9 @@ public final class RankingProvider {
      *  - p <= 0    → devuelve lista vacía.
      */
     public static List<String> getTopByPercent(double p) {
-<<<<<<< HEAD
-=======
     	if (p > 100) p = 100;
     	if (p > 1) p /= 100.0;
 
->>>>>>> feature/alberto
         int k = Math.min(RANKING_169.length, Math.max(0, (int)Math.ceil(RANKING_169.length * p)));
         if (k == 0) return Collections.emptyList();
         ArrayList<String> top = new ArrayList<>(k);
@@ -85,30 +78,23 @@ public final class RankingProvider {
      */
     public static boolean[][][] getMaskForPercent(double percent) {
         boolean[][][] mask = new boolean[13][13][2];
-<<<<<<< HEAD
-        int limit = Math.min(RANKING_169.length, (int)Math.round(RANKING_169.length * percent));
-=======
         int limit = Math.min(RANKING_169.length, (int)Math.ceil(RANKING_169.length * percent));
->>>>>>> feature/alberto
         for (int i = 0; i < limit; i++) {
             mark(mask, RANKING_169[i]);
         }
         return mask;
     }
-<<<<<<< HEAD
-=======
     
     /**
      * Devuelve true si una mano concreta está dentro del top por porcentaje dado.
      * Usa HandUtils.to169() para convertir la mano real a su forma textual.
      */
-    public static boolean isInTopPercent(tp2.model.Hand hand, double percent) {
+    public static boolean isInTopPercent(p3.model.Hand hand, double percent) {
         String normalized = HandUtils.to169(hand);
         List<String> top = getTopByPercent(percent);
         return top.contains(normalized);
     }
 
->>>>>>> feature/alberto
 
     // ======================
     //    FUNCIONES APOYO
