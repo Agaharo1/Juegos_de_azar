@@ -1,20 +1,8 @@
 package p3.gui;
 
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.FlowLayout;
-import java.awt.Frame;
-import java.awt.GridLayout;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Set;
-
-import javax.swing.BorderFactory;
-import javax.swing.JButton;
-import javax.swing.JDialog;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JTextField;
+import java.awt.*;
+import java.util.*;
+import javax.swing.*;
 
 import p3.logic.Deck;
 import p3.model.Board;
@@ -22,6 +10,7 @@ import p3.model.CardValidator;
 import p3.model.GameState;
 
 public class BoardEditorDialog extends JDialog {
+
     private final GameState state;
     private final Deck deck;
 
@@ -29,92 +18,148 @@ public class BoardEditorDialog extends JDialog {
     private JLabel errorLabel;
     private boolean saved = false;
 
+    private final Phase phase;   // fase actual al abrir el editor
+
     public BoardEditorDialog(Frame owner, GameState state, Deck deck) {
         super(owner, "Editar Board", true);
         this.state = state;
         this.deck = deck;
+        this.phase = state.getPhase();
         initializeComponents();
     }
 
     private void initializeComponents() {
         setLayout(new BorderLayout(10, 10));
-        setSize(400, 300);
+        setSize(400, 250);
         setLocationRelativeTo(getOwner());
 
         JPanel fields = new JPanel(new GridLayout(6, 2, 8, 8));
         fields.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        fields.add(new JLabel("Flop 1:")); flop1 = new JTextField(); fields.add(flop1);
-        fields.add(new JLabel("Flop 2:")); flop2 = new JTextField(); fields.add(flop2);
-        fields.add(new JLabel("Flop 3:")); flop3 = new JTextField(); fields.add(flop3);
-        fields.add(new JLabel("Turn:"));   turn  = new JTextField(); fields.add(turn);
-        fields.add(new JLabel("River:"));  river = new JTextField(); fields.add(river);
+        Board board = state.getBoard();
+        String[] raw = board.raw();
 
+        // ----------- FLOP  -----------
+        fields.add(new JLabel("Flop 1:"));
+        flop1 = new JTextField(raw[0]);
+        flop1.setEditable(phase == Phase.PREFLOP);   // editable solo antes del flop
+        fields.add(flop1);
+
+        fields.add(new JLabel("Flop 2:"));
+        flop2 = new JTextField(raw[1]);
+        flop2.setEditable(phase == Phase.PREFLOP);
+        fields.add(flop2);
+
+        fields.add(new JLabel("Flop 3:"));
+        flop3 = new JTextField(raw[2]);
+        flop3.setEditable(phase == Phase.PREFLOP);
+        fields.add(flop3);
+
+        // ----------- TURN  -----------
+        fields.add(new JLabel("Turn:"));
+        turn = new JTextField(raw[3]);
+        turn.setEditable(phase == Phase.FLOP);       // editable solo cuando pulsas TURN
+        fields.add(turn);
+
+        // ----------- RIVER -----------
+        fields.add(new JLabel("River:"));
+        river = new JTextField(raw[4]);
+        river.setEditable(phase == Phase.TURN);      // editable solo cuando pulsas RIVER
+        fields.add(river);
+
+        // —— ERROR —— 
         errorLabel = new JLabel(" ");
         errorLabel.setForeground(Color.RED);
         fields.add(errorLabel);
 
         add(fields, BorderLayout.CENTER);
 
+        // —— BOTONES ——
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         JButton btnSave = new JButton("Guardar");
-        JButton btnClear = new JButton("Limpiar");
         JButton btnCancel = new JButton("Cancelar");
+
         btnSave.addActionListener(e -> onSave());
-        btnClear.addActionListener(e -> onClear());
         btnCancel.addActionListener(e -> dispose());
-        buttons.add(btnClear);
+
         buttons.add(btnCancel);
         buttons.add(btnSave);
         add(buttons, BorderLayout.SOUTH);
     }
 
     private void onSave() {
-        java.util.List<String> entered = new ArrayList<>();
-        String[] inputs = {
-            flop1.getText().trim(),
-            flop2.getText().trim(),
-            flop3.getText().trim(),
-            turn.getText().trim(),
-            river.getText().trim()
-        };
 
-        for (String c : inputs) {
-            if (!c.isEmpty()) {
-                if (!CardValidator.isValidCode(c)) { showError("Formato inválido: " + c); return; }
-                if (entered.contains(c))          { showError("Cartas duplicadas: " + c); return; }
-                entered.add(c);
-            }
+        Board b = state.getBoard();
+
+        // ========== VALIDA SOLO CAMPOS EDITABLES ==========
+
+        // FLOP
+        if (phase == Phase.PREFLOP) {
+            if (!validThree(flop1.getText(), flop2.getText(), flop3.getText()))
+                return;
+
+            b.setFlop(flop1.getText().trim(), flop2.getText().trim(), flop3.getText().trim());
+            state.setPhase(Phase.FLOP);
         }
 
-        Set<String> used = new HashSet<>(state.allUsedCards());
-        for (String c : entered) {
-            if (used.contains(c)) { showError("Esa carta ya está en uso: " + c); return; }
+        // TURN
+        if (phase == Phase.FLOP) {
+            String c = turn.getText().trim();
+            if (!validOne(c)) return;
+
+            b.setTurn(c);
+            state.setPhase(Phase.TURN);
         }
 
-        Board board = state.getBoard();
-        board.clear();
-        if (entered.size() >= 3) board.setFlop(inputs[0], inputs[1], inputs[2]);
-        if (entered.size() >= 4) board.setTurn(inputs[3]);
-        if (entered.size() >= 5) board.setRiver(inputs[4]);
+        // RIVER
+        if (phase == Phase.TURN) {
+            String c = river.getText().trim();
+            if (!validOne(c)) return;
 
-        int n = entered.size();
-        if (n >= 5) state.setPhase(Phase.RIVER);
-        else if (n == 4) state.setPhase(Phase.TURN);
-        else if (n >= 3) state.setPhase(Phase.FLOP);
-        else             state.setPhase(Phase.PREFLOP);
+            b.setRiver(c);
+            state.setPhase(Phase.RIVER);
+        }
 
-        if (deck != null) deck.removeCards(state.allUsedCards());
-
+        deck.removeCards(state.allUsedCards());
         saved = true;
         dispose();
     }
 
-    private void onClear() {
-        flop1.setText(""); flop2.setText(""); flop3.setText("");
-        turn.setText(""); river.setText(""); errorLabel.setText(" ");
+    private boolean validThree(String c1, String c2, String c3) {
+        if (!validOne(c1) || !validOne(c2) || !validOne(c3)) return false;
+
+        Set<String> s = new HashSet<>(Arrays.asList(c1, c2, c3));
+        if (s.size() != 3) {
+            showError("Flop no puede tener duplicados");
+            return false;
+        }
+
+        return true;
+    }
+
+    private boolean validOne(String c) {
+        if (c == null || c.isBlank()) {
+            showError("Campo vacío");
+            return false;
+        }
+        if (!CardValidator.isValidCode(c)) {
+            showError("Formato inválido: " + c);
+            return false;
+        }
+
+        // Evitar duplicar cartas ya usadas (excepto las del mismo board)
+        Set<String> used = new HashSet<>(state.allUsedCards());
+        used.removeAll(state.getBoard().visible());
+
+        if (used.contains(c)) {
+            showError("Carta ya usada: " + c);
+            return false;
+        }
+
+        return true;
     }
 
     private void showError(String msg) { errorLabel.setText(msg); }
+
     public boolean isSaved() { return saved; }
 }

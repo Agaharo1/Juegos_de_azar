@@ -859,8 +859,45 @@ public class PokerEquityGUI extends JFrame {
         }
 
         private void abrirDialogoTurn() {
-            new TurnDecisionDialog(PokerEquityGUI.this).setVisible(true);
+            // Por defecto: modo manual (sin datos precargados)
+            String heroCards = null;
+            List<String> board4 = null;
+
+            // Intentar modo AUTO solo si estamos en TURN
+            if (phase == Phase.TURN) {
+                // Jugadores activos = tienen mano y no han hecho fold lógico
+                java.util.List<Integer> activos = new java.util.ArrayList<>();
+                for (int i = 0; i < playerPanels.size(); i++) {
+                    Hand h = stateGetPlayerHand(i);
+                    if (h != null && !isFolded[i]) {
+                        activos.add(i);
+                    }
+                }
+
+                // Queremos exactamente 2 jugadores activos y que uno sea el HERO (seat 4)
+                if (activos.size() == 2 && activos.contains(4)) {
+                    Hand heroHand = stateGetPlayerHand(4);
+                    if (heroHand != null) {
+                        heroCards = heroHand.toString(); // ej: "AhKh"
+                    }
+
+                    // Board en el Turn: 4 primeras cartas del board
+                    String[] raw = state.getBoard().raw();
+                    if (raw[0] != null && !raw[0].isEmpty() &&
+                        raw[1] != null && !raw[1].isEmpty() &&
+                        raw[2] != null && !raw[2].isEmpty() &&
+                        raw[3] != null && !raw[3].isEmpty()) {
+
+                        board4 = java.util.List.of(raw[0], raw[1], raw[2], raw[3]);
+                    }
+                }
+            }
+
+            // Si heroCards y board4 son null → se abre en modo "desde cero" (todo manual).
+            TurnDecisionDialog dlg = new TurnDecisionDialog(PokerEquityGUI.this, heroCards, board4);
+            dlg.setVisible(true);
         }
+
 
         private void onComprobarRango() {
             String rango;
@@ -1124,18 +1161,32 @@ public class PokerEquityGUI extends JFrame {
                 return;
             }
 
+            // Guardamos la fase anterior para saber si cambiamos de calle
+            Phase oldPhase = phase;
+
             BoardEditorDialog dlg = new BoardEditorDialog(PokerEquityGUI.this, state, deck);
             dlg.setVisible(true);
 
             if (dlg.isSaved()) {
-                phase = state.getPhase();
+                // La fase que haya dejado el editor
+                Phase newPhase = state.getPhase();
+
+                // Si realmente hemos avanzado de calle → nueva ronda de apuestas
+                if (newPhase != oldPhase) {
+                    bettingState.newBettingRound();
+                    turnoActual = 0;        // muy importante
+                }
+
+                phase = newPhase;
+
                 tablePanel.repaint();
                 updateButtonsState();
-                updateEquities();
+                updateEquities();          // esto ya llama internamente a updateNextDecisionButton()
                 statusBar.setMessage("Board editado manualmente.");
                 statusBar.setRight("Mazo restante: " + deck.remaining());
             }
         }
+
 
         private String drawUnique() {
             Set<String> used = new HashSet<>(state.allUsedCards());

@@ -84,6 +84,42 @@ public class TurnDecisionLogic {
         // Trabajaremos con enteros redondeando ties:
         return outs + (ties / 2); 
     }
+    
+    public static class TurnDecisionResult {
+        public final double avgOuts;       // media de outs
+        public final double equityPercent; // equity aproximada en %
+
+        public final boolean call;         // true → CALL, false → FOLD
+
+        public TurnDecisionResult(double avgOuts, double equityPercent, boolean call) {
+            this.avgOuts = avgOuts;
+            this.equityPercent = equityPercent;
+            this.call = call;
+        }
+    }
+    /**
+     * Calcula outs medios, equity aproximada y decisión CALL/FOLD
+     * según el EM introducido por el usuario.
+     *
+     * @param heroHand mano del Hero
+     * @param villainRangeRaw rango textual del villano (ej: "AA,QQ+,AKs")
+     * @param board 4 cartas del board en el Turn
+     * @param emPercent EM en porcentaje (ej: 30.0)
+     */
+    public static TurnDecisionResult evaluateDecision(Hand heroHand,
+                                                      String villainRangeRaw,
+                                                      List<String> board,
+                                                      double emPercent) {
+        double avgOuts = calculateAverageOuts(heroHand, villainRangeRaw, board);
+
+        // En el Turn quedan 44 cartas posibles en el river (como en el enunciado).
+        double equity = (avgOuts / 44.0) * 100.0;
+
+        boolean call = avgOuts > emPercent;
+
+        return new TurnDecisionResult(avgOuts, equity, call);
+    }
+
 
     // --- Expansión de combinaciones ---
 
