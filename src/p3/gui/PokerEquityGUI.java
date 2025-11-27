@@ -27,7 +27,7 @@ import java.util.Set;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JFrame;
-import javax.swing.JOptionPane; 
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import javax.swing.border.CompoundBorder;
@@ -39,7 +39,6 @@ import p3.logic.HandUtils;
 import p3.logic.PokerStoveEquityCalculator;
 import p3.logic.RangeParser;
 import p3.logic.RankingProvider;
-import p3.logic.TurnDecisionLogic;
 import p3.model.BettingState;
 import p3.model.GameState;
 import p3.model.Hand;
@@ -50,8 +49,30 @@ import p3.model.Hand;
  * - Coloca 6 PlayerPanel con botón "Editar" por jugador.
  * - Permite editar Board cuando Random Board está OFF.
  * - Mantiene coherente GameState + Deck y recalcula equity.
+ * - Implementa lógica de apuestas por fases con botón "Siguiente jugador".
  */
 public class PokerEquityGUI extends JFrame {
+
+    // ---- Estado de apuestas y decisiones ----
+    private final BettingState bettingState = new BettingState();
+
+    // Estado de fold visual/lógico (no elimina cartas, solo del cálculo)
+    private final boolean[] isFolded = new boolean[6];
+
+    // Orden fijo de los jugadores: UTG(3) → HJ(4) → CO(5) → BTN(0) → SB(1) → BB(2)
+    private final int[] turnOrder = {3, 4, 5, 0, 1, 2};
+
+    // Índice del turno actual (0..5)
+    private int turnoActual = 0;
+
+    // Flag: ¿ya han sido introducidos TODOS los RG + EM?
+    private boolean allRangesReady = false;
+
+    // Últimas equities calculadas por jugador (por nombre)
+    private Map<String, Double> lastEquities = Map.of();
+
+    // Botón para avanzar el turno manualmente
+    private JButton btnNextDecision;
 
     // Layout principal
     private JPanel mainPanel;
@@ -65,24 +86,21 @@ public class PokerEquityGUI extends JFrame {
     private Phase phase = Phase.PREFLOP;
     private Deck deck;
 
-    // Cálculo de equity (PokerStove con fallback a Monte Carlo)
+    // Cálculo de equity
     private final EquityCalculator calc = new PokerStoveEquityCalculator();
 
-    // Estado del juego
+    // Estado del juego (manos + board + fase)
     private final GameState state = new GameState();
 
     // Controles inferiores
     private JButton btnDeal, btnFlop, btnTurn, btnRiver, btnReset, btnComprobar, btnEditBoard, btnTurnDecision;
     private HeroPanel heroPanel;
 
-    // Barra estado
+    // Barra de estado
     private StatusBar statusBar;
 
     // Controlador
     private final Controller controller = new Controller();
-    
-    // Estado de apuestas
-    private final BettingState bettingState = new BettingState();
 
     public PokerEquityGUI() {
         setTitle("Poker Equity Calculator");
@@ -128,8 +146,8 @@ public class PokerEquityGUI extends JFrame {
                 int centerX = w / 2, centerY = h / 2;
 
                 // Mesa
-                int ellipseW = (int)(w * 0.7);
-                int ellipseH = (int)(h * 0.6);
+                int ellipseW = (int) (w * 0.7);
+                int ellipseH = (int) (h * 0.6);
                 g2.setColor(UiTheme.BG_CARD);
                 g2.fillOval(centerX - ellipseW / 2, centerY - ellipseH / 2, ellipseW, ellipseH);
                 g2.setColor(UiTheme.TABLE_STROKE);
@@ -138,10 +156,10 @@ public class PokerEquityGUI extends JFrame {
 
                 // Nº de cartas visibles según fase
                 int show = switch (phase) {
-                    case FLOP  -> 3;
-                    case TURN  -> 4;
+                    case FLOP -> 3;
+                    case TURN -> 4;
                     case RIVER -> 5;
-                    default    -> 0;
+                    default -> 0;
                 };
 
                 // Board
@@ -179,33 +197,40 @@ public class PokerEquityGUI extends JFrame {
 
     private void createPlayerPanels(JPanel tablePanel) {
         tablePanel.addComponentListener(new ComponentAdapter() {
-            @Override public void componentResized(ComponentEvent e) { positionPlayers(); }
+            @Override
+            public void componentResized(ComponentEvent e) {
+                positionPlayers();
+            }
         });
 
         playerPanels = new ArrayList<>();
         String[] names = {"Button", "Small Blind", "Big Blind", "UTG", "Highjack", "Cut-off"};
-        
+
         for (int i = 0; i < 6; i++) {
-            PlayerPanel pp = new PlayerPanel(names[i], i == 4); 
+            PlayerPanel pp = new PlayerPanel(names[i], i == 4);
             final int seat = i;
+
             pp.setOnEditHand(() -> abrirEditorMano(seat));
             pp.setOnClearHand(() -> quitarMano(seat));
-            
+
             // Callback para RANGO
             pp.setOnEditRange(() -> {
                 String rangoActual = pp.getRangeInput();
                 String nuevoRango = (String) JOptionPane.showInputDialog(
-                        PokerEquityGUI.this, 
-                        "Introduce el Rango (ej: AA,KK+ o 70%):", 
-                        "Editar Rango - " + pp.getPlayerName(), 
+                        PokerEquityGUI.this,
+                        "Introduce el Rango (ej: AA,KK+ o 70%):",
+                        "Editar Rango - " + pp.getPlayerName(),
                         JOptionPane.PLAIN_MESSAGE,
                         null,
                         null,
-                        rangoActual 
+                        rangoActual
                 );
 
-                if (nuevoRango != null) { 
+                if (nuevoRango != null) {
                     pp.setRangeText(nuevoRango.trim());
+                    checkAllRangesReady();
+                    updateEquities();
+                    updateNextDecisionButton();
                 }
             });
 
@@ -213,17 +238,20 @@ public class PokerEquityGUI extends JFrame {
             pp.setOnEditEM(() -> {
                 String emActual = pp.getEMInput();
                 String nuevoEM = (String) JOptionPane.showInputDialog(
-                        PokerEquityGUI.this, 
-                        "Introduce el Equity Mínimo (ej: 25% o 25):", 
-                        "Editar EM - " + pp.getPlayerName(), 
+                        PokerEquityGUI.this,
+                        "Introduce el Equity Mínimo (ej: 25% o 25):",
+                        "Editar EM - " + pp.getPlayerName(),
                         JOptionPane.PLAIN_MESSAGE,
                         null,
                         null,
-                        emActual 
+                        emActual
                 );
 
-                if (nuevoEM != null) { 
+                if (nuevoEM != null) {
                     pp.setEMText(nuevoEM.trim().replace("%", ""));
+                    checkAllRangesReady();
+                    updateEquities();
+                    updateNextDecisionButton();
                 }
             });
 
@@ -237,16 +265,16 @@ public class PokerEquityGUI extends JFrame {
         if (w == 0 || h == 0) return;
 
         int centerX = w / 2, centerY = h / 2;
-        int rx = (int)(w * 0.40), ry = (int)(h * 0.35);
+        int rx = (int) (w * 0.40), ry = (int) (h * 0.35);
 
-        int panelW = 160, panelH = 260; 
-        
+        int panelW = 160, panelH = 260;
+
         double offset = Math.PI * 0.5;
 
         for (int i = 0; i < playerPanels.size(); i++) {
             double ang = offset + (2 * Math.PI * i / playerPanels.size());
-            int x = (int)(centerX + rx * Math.cos(ang)) - panelW / 2;
-            int y = (int)(centerY + ry * Math.sin(ang)) - panelH / 2;
+            int x = (int) (centerX + rx * Math.cos(ang)) - panelW / 2;
+            int y = (int) (centerY + ry * Math.sin(ang)) - panelH / 2;
             playerPanels.get(i).setBounds(x, y, panelW, panelH);
         }
     }
@@ -267,39 +295,51 @@ public class PokerEquityGUI extends JFrame {
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
         buttonPanel.setBackground(UiTheme.BG_PANEL);
 
-        btnDeal       = createStyledButton("Deal");
-        btnFlop       = createStyledButton("Flop");
-        btnTurn       = createStyledButton("Turn");
-        btnRiver      = createStyledButton("River");
-        btnReset      = createStyledButton("Reset");
-        btnComprobar  = createStyledButton("Comprobar rango");
+        btnDeal = createStyledButton("Deal");
+        btnFlop = createStyledButton("Flop");
+        btnTurn = createStyledButton("Turn");
+        btnRiver = createStyledButton("River");
+        btnReset = createStyledButton("Reset");
+        btnComprobar = createStyledButton("Comprobar rango");
         btnEditBoard = createStyledButton("Editar Board");
         btnEditBoard.setActionCommand("EDIT_BOARD");
         btnEditBoard.addActionListener(controller);
-        buttonPanel.add(btnEditBoard);
-        
-        // Botón específico para el apartado 2.2 (Mano vs Rango)
+
+        // Botón específico para el apartado 2.2 (Turn Decision)
         btnTurnDecision = createStyledButton("Turn Decision (2.2)");
         btnTurnDecision.setActionCommand("TURN_DECISION");
         btnTurnDecision.addActionListener(controller);
+
+        btnDeal.setActionCommand("DEAL");
+        btnDeal.addActionListener(controller);
+        btnFlop.setActionCommand("FLOP");
+        btnFlop.addActionListener(controller);
+        btnTurn.setActionCommand("TURN");
+        btnTurn.addActionListener(controller);
+        btnRiver.setActionCommand("RIVER");
+        btnRiver.addActionListener(controller);
+        btnReset.setActionCommand("RESET");
+        btnReset.addActionListener(controller);
+        btnComprobar.setActionCommand("COMPROBAR");
+        btnComprobar.addActionListener(controller);
+        btnEditBoard.setActionCommand("EDIT_BOARD");
+        btnEditBoard.addActionListener(controller);
+
+        btnNextDecision = createStyledButton("Siguiente jugador");
+        btnNextDecision.setActionCommand("NEXT_DECISION");
+        btnNextDecision.addActionListener(controller);
+        btnNextDecision.setEnabled(false);
+
+        // Orden visual de los botones
+        buttonPanel.add(btnEditBoard);
         buttonPanel.add(btnTurnDecision);
-        
-
-        btnDeal.setActionCommand("DEAL");            btnDeal.addActionListener(controller);
-        btnFlop.setActionCommand("FLOP");            btnFlop.addActionListener(controller);
-        btnTurn.setActionCommand("TURN");            btnTurn.addActionListener(controller);
-        btnRiver.setActionCommand("RIVER");          btnRiver.addActionListener(controller);
-        btnReset.setActionCommand("RESET");          btnReset.addActionListener(controller);
-        btnComprobar.setActionCommand("COMPROBAR");  btnComprobar.addActionListener(controller);
-        btnEditBoard.setActionCommand("EDIT_BOARD"); btnEditBoard.addActionListener(controller);
-
+        buttonPanel.add(btnNextDecision);
         buttonPanel.add(btnDeal);
         buttonPanel.add(btnFlop);
         buttonPanel.add(btnTurn);
         buttonPanel.add(btnRiver);
         buttonPanel.add(btnReset);
         buttonPanel.add(btnComprobar);
-        buttonPanel.add(btnEditBoard);
 
         updateButtonsState();
         panel.add(buttonPanel, BorderLayout.EAST);
@@ -309,168 +349,269 @@ public class PokerEquityGUI extends JFrame {
     private JButton createStyledButton(String text) {
         JButton btn = new JButton(text);
         btn.setFont(UiTheme.F_13B);
-        btn.setPreferredSize(new Dimension(100, 40));
+        btn.setPreferredSize(new Dimension(130, 40));
         btn.setBackground(UiTheme.ACCENT_PRIMARY);
         btn.setForeground(Color.WHITE);
         btn.setFocusPainted(false);
         btn.setBorderPainted(false);
         btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
         btn.addMouseListener(new MouseAdapter() {
-            @Override public void mouseEntered(MouseEvent e) { btn.setBackground(UiTheme.ACCENT_PRIMARY_HOV); }
-            @Override public void mouseExited (MouseEvent e) { btn.setBackground(UiTheme.ACCENT_PRIMARY);    }
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                btn.setBackground(UiTheme.ACCENT_PRIMARY_HOV);
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                btn.setBackground(UiTheme.ACCENT_PRIMARY);
+            }
         });
         return btn;
     }
 
     private void updateButtonsState() {
-        if (btnDeal != null)  btnDeal.setEnabled(true);
+        if (btnDeal != null) btnDeal.setEnabled(true);
         if (btnReset != null) btnReset.setEnabled(true);
 
         boolean hasDeck = (deck != null);
-        if (btnFlop  != null) btnFlop.setEnabled (hasDeck && phase == Phase.PREFLOP);
-        if (btnTurn  != null) btnTurn.setEnabled (hasDeck && phase == Phase.FLOP);
+        if (btnFlop != null) btnFlop.setEnabled(hasDeck && phase == Phase.PREFLOP);
+        if (btnTurn != null) btnTurn.setEnabled(hasDeck && phase == Phase.FLOP);
         if (btnRiver != null) btnRiver.setEnabled(hasDeck && phase == Phase.TURN);
 
-        // Habilita "Editar Board" cuando hay mazo y Random Board está OFF
         if (btnEditBoard != null) btnEditBoard.setEnabled(hasDeck && !heroPanel.isRandomBoard());
     }
 
+    private void checkAllRangesReady() {
+        for (int i = 0; i < playerPanels.size(); i++) {
+            PlayerPanel pp = playerPanels.get(i);
+            if (pp.getRangeInput().isBlank() || pp.getEMInput().isBlank()) {
+                allRangesReady = false;
+                return;
+            }
+        }
+        allRangesReady = true;
+    }
+
+    private void updateNextDecisionButton() {
+        if (btnNextDecision == null) return;
+
+        if (!allRangesReady || deck == null) {
+            btnNextDecision.setEnabled(false);
+            marcarJugadorActivo(-1);
+            return;
+        }
+
+        int active = 0;
+        for (int i = 0; i < playerPanels.size(); i++) {
+            Hand h = stateGetPlayerHand(i);
+            if (h != null && !isFolded[i]) active++;
+        }
+
+        boolean canAct = active >= 2 && turnoActual < turnOrder.length;
+        btnNextDecision.setEnabled(canAct);
+
+        if (!canAct) {
+            marcarJugadorActivo(-1);
+            return;
+        }
+
+        // Marcar al siguiente jugador que va a actuar
+        int seatToMark = -1;
+        for (int idx = turnoActual; idx < turnOrder.length; idx++) {
+            int seat = turnOrder[idx];
+            Hand h = stateGetPlayerHand(seat);
+            if (h != null && !isFolded[seat]) {
+                seatToMark = seat;
+                break;
+            }
+        }
+        marcarJugadorActivo(seatToMark);
+    }
 
     // =========================
     //   Equity y utilidades
     // =========================
     private void updateEquities() {
         state.ensurePlayersCount(playerPanels.size());
+        checkAllRangesReady();
 
-        List<String> allNames = new ArrayList<>();
+        // Si aún no están todos los RG + EM, no calculamos equities
+        if (!allRangesReady) {
+            for (PlayerPanel pp : playerPanels) {
+                pp.setEquity(0.0);
+                pp.setRangeStatus(null);
+                pp.setEMStatus(null);
+            }
+            lastEquities = Map.of();
+            updateNextDecisionButton();
+            return;
+        }
+
         List<Hand> allHands = state.getPlayers();
         List<String> board = state.getBoard().visible();
 
-        // 🎯 Filtrar solo los jugadores activos (que tienen mano)
+        // Jugadores activos (tienen mano y no han hecho fold)
         List<String> activeNames = new ArrayList<>();
         List<Hand> activeHands = new ArrayList<>();
-        List<Integer> activeIndices = new ArrayList<>();
 
         for (int i = 0; i < allHands.size(); i++) {
             Hand h = allHands.get(i);
-            if (h != null) { // solo entra si el jugador sigue en la mano
+            if (h != null && !isFolded[i]) {
                 activeHands.add(h);
                 activeNames.add(playerPanels.get(i).getPlayerName());
-                activeIndices.add(i);
             }
         }
 
-        // Si no hay al menos 2 jugadores activos, no tiene sentido calcular equity
         if (activeHands.size() < 2) {
             for (PlayerPanel pp : playerPanels) pp.setEquity(0.0);
+            lastEquities = Map.of();
+            updateNextDecisionButton();
             return;
         }
 
         int trials = switch (phase) {
             case PREFLOP -> 100000;
-            case FLOP    -> 200000;
-            case TURN    -> 300000;
-            case RIVER   -> 1;
+            case FLOP -> 200000;
+            case TURN -> 300000;
+            case RIVER -> 1;
         };
 
         String seedKey = String.join("-", activeNames) + "|" + activeHands + "|" + board + "|" + phase;
         long seed = seedKey.hashCode();
 
         Map<String, Double> equities = calc.calcularEquity(activeNames, activeHands, board, trials, seed);
+        lastEquities = equities;
 
-        // ✅ Aplicar resultados solo a los jugadores activos
+        // Aplicar resultados de equity
         for (int i = 0; i < playerPanels.size(); i++) {
             PlayerPanel pp = playerPanels.get(i);
-            if (activeIndices.contains(i)) {
-                String name = playerPanels.get(i).getPlayerName();
+            Hand h = allHands.get(i);
+
+            if (h != null && !isFolded[i]) {
+                String name = pp.getPlayerName();
                 Double eq = equities.getOrDefault(name, 0.0);
                 pp.setEquity(eq);
+            } else if (h != null && isFolded[i]) {
+                // Sigue mostrando las cartas, pero equity 0
+                pp.setEquity(0.0);
             } else {
-                pp.setEquity(0.0); // los que han hecho fold
+                // Asiento sin mano
+                pp.setEquity(0.0);
+                pp.setRangeStatus(null);
+                pp.setEMStatus(null);
             }
         }
-        
-     // =============================
-     //  VALIDACIÓN DE RANGOS + EM Y ACCIÓN AUTOMÁTICA
-     // =============================
-        for (int i = 0; i < playerPanels.size(); i++) {
 
+        // Validación visual RG / EM (solo para jugadores con mano y no foldeados)
+        for (int i = 0; i < playerPanels.size(); i++) {
             PlayerPanel pp = playerPanels.get(i);
             Hand hand = state.getPlayers().get(i);
-            
-            // 1. Jugador ha hecho fold o no tiene mano repartida
-            if (hand == null) {
-                pp.setBackground(UiTheme.BG_CARD);
+
+            if (hand == null || isFolded[i]) {
+                // Dejamos el estado visual tal cual (en fold se mantiene info)
                 continue;
             }
-            
-            // --- Equity del jugador ---
-            double equityJugador = equities.getOrDefault(pp.getPlayerName(), 0.0);
-            
-            // --- Equity Mínimo (EM) ---
-            String rawEM = pp.getEMInput().replace("%", "").trim();
-            double em = 0.0;
-            boolean tieneEM = !rawEM.isEmpty();
-            try {
-                if (tieneEM) em = Double.parseDouble(rawEM);
-            } catch (Exception ignore) { /* EM inválido, lo tratamos como 0.0 */ }
-            
-            boolean cumpleEM = (!tieneEM) || (equityJugador >= em);
 
-            // --- Determinar Rango (RG) ---
+            double equityJugador = equities.getOrDefault(pp.getPlayerName(), 0.0);
+
+            // EM
+            String rawEM = pp.getEMInput().replace("%", "").trim();
+            boolean tieneEM = !rawEM.isEmpty();
+            double em = 0.0;
+
+            if (tieneEM) {
+                try {
+                    em = Double.parseDouble(rawEM);
+                } catch (Exception ignore) {
+                    em = 0.0;
+                }
+            }
+
+            boolean cumpleEM = (!tieneEM) || (equityJugador >= em);
+            pp.setEMStatus(tieneEM ? cumpleEM : null);
+
+            // RANGO
             String rangoRaw = pp.getRangeInput().trim();
             boolean enRango = false;
 
             if (!rangoRaw.isEmpty()) {
                 try {
                     if (rangoRaw.endsWith("%") || rangoRaw.matches("\\d+(\\.\\d+)?")) {
-                        // Porcentaje
                         double pct = Double.parseDouble(rangoRaw.replace("%", "").trim());
                         enRango = RankingProvider.isInTopPercent(hand, pct);
                     } else {
-                        // Rango Textual
-                    	String h169 = p3.logic.HandUtils.to169(hand).toUpperCase(Locale.ROOT);
-                    	List<String> parsed = RangeParser.parse(rangoRaw.toUpperCase(Locale.ROOT));
-                    	enRango = parsed.contains(h169);
+                        String h169 = HandUtils.to169(hand).toUpperCase(Locale.ROOT);
+                        List<String> parsed = RangeParser.parse(rangoRaw.toUpperCase(Locale.ROOT));
+                        enRango = parsed.contains(h169);
                     }
                 } catch (Exception ignore) {
-                    enRango = false; // Fallo en el parseo
+                    enRango = false;
                 }
             }
-            
-            // --- 2. Lógica de Decisión (Issue #33) ---
-            boolean cumpleDecision = enRango && cumpleEM;
-            
-            if (!cumpleDecision) {
-                // ❌ FOLD AUTOMÁTICO: Mano fuera de rango O equity < EM
-                quitarMano(i); // Utiliza el método existente para Fold
-                pp.setBackground(new Color(130, 0, 0)); // Rojo: Decisión = Fold
-                continue; // Ya no hay que tomar más acción para este jugador
-            }
-            
-            // ✅ CUMPLE RG Y EM: Call o Bet/Check
-            
-            int toCall = bettingState.toCall(i);
-            
-            if (toCall > 0) {
-                // Hay apuesta previa: Call (simplificamos: siempre call si cumple)
-                bettingState.actionCall(i);
-                pp.setBackground(new Color(0, 130, 0)); // Verde: Decisión = Call
+
+            pp.setRangeStatus(rangoRaw.isEmpty() ? null : enRango);
+            pp.setBackground(UiTheme.BG_CARD);
+        }
+
+        updateNextDecisionButton();
+    }
+
+    private boolean validateRange(Hand hand, String rangoRaw) {
+
+    	
+        if (rangoRaw == null || rangoRaw.isBlank()) return false;
+        
+        
+
+        try {
+            if (rangoRaw.endsWith("%") || rangoRaw.matches("\\d+(\\.\\d+)?")) {
+                double pct = Double.parseDouble(rangoRaw.replace("%", "").trim());
+                return RankingProvider.isInTopPercent(hand, pct);
             } else {
-                // No hay apuesta previa: Bet (simulamos una apuesta mínima o Check)
-                if (i == 4) { // El héroe decide hacer BET
-                    // Apuesta simplificada: 100 fichas
-                    bettingState.actionBet(i, 100); 
-                } else {
-                    // NPCs hacen Check si no hay apuesta
-                    bettingState.actionCheck(i);
-                }
-                pp.setBackground(new Color(0, 130, 0)); // Verde: Decisión = Check/Bet
+                String h169 = HandUtils.to169(hand).toUpperCase(Locale.ROOT);
+
+                List<String> parsed = RangeParser.parse(rangoRaw.toUpperCase(Locale.ROOT));
+                
+                
+                return parsed.contains(h169);
+            }
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean validateEM(double equity, String emRaw) {
+        if (emRaw == null || emRaw.isBlank()) return true; // sin EM → siempre OK
+        try {
+            double em = Double.parseDouble(emRaw);
+            return equity >= em;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private double obtenerEquity(String playerName) {
+        if (lastEquities == null) return 0.0;
+        return lastEquities.getOrDefault(playerName, 0.0);
+    }
+
+    private void aplicarFoldVisual(int seat) {
+        isFolded[seat] = true;
+
+        // Registrar cartas como "folded" para el mazo
+        Hand h = stateGetPlayerHand(seat);
+        if (h != null) {
+            state.addFoldedHand(h);
+            if (deck != null) {
+                deck.removeCards(h.asList());
             }
         }
 
+        PlayerPanel pp = playerPanels.get(seat);
+        pp.setBackground(new Color(40, 40, 40));
+        pp.setBorder(BorderFactory.createLineBorder(Color.GRAY, 3));
+        pp.setEquity(0.0);
     }
-
 
     private void syncDeckAfterChange() {
         if (deck != null) {
@@ -481,10 +622,12 @@ public class PokerEquityGUI extends JFrame {
         }
     }
 
-
     private Hand stateGetPlayerHand(int i) {
-        try { return state.getPlayers().get(i); }
-        catch (Exception e) { return null; }
+        try {
+            return state.getPlayers().get(i);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private HandEditorDialog.ValidationResult validarManoContraEstado(String text, int seat) {
@@ -531,6 +674,7 @@ public class PokerEquityGUI extends JFrame {
                 hand -> {
                     state.setPlayerHand(seat, hand);
                     playerPanels.get(seat).setCards(hand.toString());
+                    isFolded[seat] = false;
                     syncDeckAfterChange();
                     updateEquities();
                     tablePanel.repaint();
@@ -539,6 +683,7 @@ public class PokerEquityGUI extends JFrame {
                 () -> {
                     state.setPlayerHand(seat, null);
                     playerPanels.get(seat).setCards("");
+                    isFolded[seat] = false;
                     syncDeckAfterChange();
                     updateEquities();
                     tablePanel.repaint();
@@ -548,7 +693,12 @@ public class PokerEquityGUI extends JFrame {
         dlg.setVisible(true);
     }
 
+    // Wrapper para mantener compatibilidad con PlayerPanel
     private void quitarMano(int seat) {
+        quitarMano(seat, false); // false = fold manual simple (asiento libre)
+    }
+
+    private void quitarMano(int seat, boolean recalc) {
         Hand hand = stateGetPlayerHand(seat);
         if (hand != null) {
             state.addFoldedHand(hand);
@@ -556,15 +706,18 @@ public class PokerEquityGUI extends JFrame {
 
         state.setPlayerHand(seat, null);
         playerPanels.get(seat).setCards("");
+        isFolded[seat] = false;
 
-        syncDeckAfterChange();
-        updateEquities();
-        tablePanel.repaint();
+        if (recalc) {
+            syncDeckAfterChange();
+            updateEquities();
+            tablePanel.repaint();
+            statusBar.setMessage("Jugador " + (seat + 1) + " ha hecho fold.");
+        }
 
-        playerPanels.get(seat).setBackground(new Color(50, 50, 50));
-        statusBar.setMessage("Jugador " + (seat + 1) + " ha hecho fold.");
+        playerPanels.get(seat).setBackground(UiTheme.BG_CARD);
+        playerPanels.get(seat).setBorder(BorderFactory.createLineBorder(UiTheme.BORDER, 3));
     }
-
 
     // =========================
     //   Controlador de botones
@@ -574,56 +727,138 @@ public class PokerEquityGUI extends JFrame {
         public void actionPerformed(ActionEvent e) {
             String cmd = e.getActionCommand();
             switch (cmd) {
-                case "DEAL"       -> repartirCartas();
-                case "FLOP"       -> mostrarFlop();
-                case "TURN"       -> mostrarTurn();
-                case "RIVER"      -> mostrarRiver();
-                case "RESET"      -> reset();
-                case "COMPROBAR"  -> onComprobarRango();
+                case "DEAL" -> repartirCartas();
+                case "FLOP" -> mostrarFlop();
+                case "TURN" -> mostrarTurn();
+                case "RIVER" -> mostrarRiver();
+                case "RESET" -> reset();
+                case "COMPROBAR" -> onComprobarRango();
                 case "EDIT_BOARD" -> onEditarBoard();
                 case "TURN_DECISION" -> abrirDialogoTurn();
+                case "NEXT_DECISION" -> procesarSiguienteJugador();
             }
         }
         
-     // Implementación de lógica de flujo #35
-        private void avanzarFase(Phase targetPhase) {
-            if (deck == null) return;
-            
-            // Validar orden: Preflop -> Flop -> Turn -> River [cite: 12]
-            if (targetPhase == Phase.FLOP && phase != Phase.PREFLOP) return;
-            if (targetPhase == Phase.TURN && phase != Phase.FLOP) return;
-            if (targetPhase == Phase.RIVER && phase != Phase.TURN) return;
-            
-            // Lógica de mostrar cartas (ya la tenías, la agrupamos)
-            if (heroPanel.isRandomBoard()) {
-                deck.removeCards(state.allUsedCards());
-                if (targetPhase == Phase.FLOP) state.getBoard().setFlop(drawUnique(), drawUnique(), drawUnique());
-                if (targetPhase == Phase.TURN) state.getBoard().setTurn(drawUnique());
-                if (targetPhase == Phase.RIVER) state.getBoard().setRiver(drawUnique());
-            } else {
-                onEditarBoard(); // Si no es random, forzar edición
+        private void abrirDecisionManual(int seat) {
+            PlayerPanel pp = playerPanels.get(seat);
+            Hand hand = stateGetPlayerHand(seat);
+
+            if (hand == null || isFolded[seat]) return;
+
+            String[] opciones = {"FOLD", "CALL", "BET 3BB"};
+            int result = JOptionPane.showOptionDialog(
+                    PokerEquityGUI.this,
+                    "Acción para " + pp.getPlayerName() + "\nMano: " + hand,
+                    "Decisión manual",
+                    JOptionPane.DEFAULT_OPTION,
+                    JOptionPane.PLAIN_MESSAGE,
+                    null,
+                    opciones,
+                    opciones[0]
+            );
+
+            switch (result) {
+                case 0: // FOLD
+                    aplicarFoldVisual(seat);
+                    statusBar.setMessage(pp.getPlayerName() + " hace FOLD (manual)");
+                    break;
+
+                case 1: // CALL
+                    bettingState.actionCall(seat);
+                    statusBar.setMessage(pp.getPlayerName() + " hace CALL (manual)");
+                    break;
+
+                case 2: // BET
+                    bettingState.actionBet(seat, 3 * 100);
+                    statusBar.setMessage(pp.getPlayerName() + " hace BET 3BB (manual)");
+                    break;
+
+                default:
+                    // Si cierra el cuadro → no pasar turno
+                    turnoActual--;
+                    statusBar.setMessage("Acción cancelada.");
+                    break;
+            }
+        }
+
+
+        private void tomarDecisionJugador(int seat) {
+
+            PlayerPanel pp = playerPanels.get(seat);
+            Hand hand = state.getPlayers().get(seat);
+
+            if (hand == null || isFolded[seat]) return;
+
+            // --- DECISIÓN MANUAL ---
+            if (pp.isManual()) {
+                abrirDecisionManual(seat);
+                return;
             }
 
-            // Actualizar fase y UI
-            phase = targetPhase;
-            state.setPhase(phase);
-            
-            // Resetear apuestas para la nueva calle (fase) [cite: 20]
-            // bettingState.newBettingRound(); // Si integraste BettingState
-            
-            tablePanel.repaint();
-            updateButtonsState();
-            updateEquities(); // Aquí se ejecuta la decisión automática
-            
-            // Señalar quién actúa primero [cite: 195]
-            // En Post-flop (Flop/Turn/River), actúa primero el Small Blind (pos 1) o el primero activo tras él.
-            marcarJugadorActivo(obtenerPrimerJugadorActivo());
-            
-            statusBar.setMessage("Fase: " + phase);
+            // --- DECISIÓN AUTOMÁTICA ---
+            String rg = pp.getRangeInput().trim();
+            String emStr = pp.getEMInput().trim();
+            double equity = obtenerEquity(pp.getPlayerName());
+
+            boolean enRango = validateRange(hand, rg);
+            boolean cumpleEM = validateEM(equity, emStr);
+
+            // FOLD automático
+            if (!enRango || !cumpleEM) {
+                aplicarFoldVisual(seat);
+                statusBar.setMessage(pp.getPlayerName() + " hace FOLD (auto)");
+                return;
+            }
+
+            // Call o Bet auto
+            int toCall = bettingState.toCall(seat);
+
+            if (toCall > 0) {
+                bettingState.actionCall(seat);
+                statusBar.setMessage(pp.getPlayerName() + " hace CALL (auto)");
+            } else {
+                bettingState.actionBet(seat, 3 * 100);
+                statusBar.setMessage(pp.getPlayerName() + " hace BET (auto)");
+            }
         }
-        
+
+
+        private void procesarSiguienteJugador() {
+            if (!allRangesReady) {
+                statusBar.setMessage("Faltan rangos/EM en algún jugador.");
+                return;
+            }
+
+            if (lastEquities == null || lastEquities.isEmpty()) {
+                updateEquities();
+                if (lastEquities == null || lastEquities.isEmpty()) {
+                    statusBar.setMessage("No se ha podido calcular equity.");
+                    return;
+                }
+            }
+
+            while (turnoActual < turnOrder.length) {
+                int seat = turnOrder[turnoActual];
+                Hand h = stateGetPlayerHand(seat);
+                if (h != null && !isFolded[seat]) {
+                    tomarDecisionJugador(seat);
+                    turnoActual++;
+                    break;
+                } else {
+                    turnoActual++;
+                }
+            }
+
+            if (turnoActual >= turnOrder.length) {
+                btnNextDecision.setEnabled(false);
+                marcarJugadorActivo(-1);
+                statusBar.setMessage("Ronda de apuestas completada en " + phase);
+            } else {
+                updateNextDecisionButton();
+            }
+        }
+
         private void abrirDialogoTurn() {
-            // Tarea #37
             new TurnDecisionDialog(PokerEquityGUI.this).setVisible(true);
         }
 
@@ -669,21 +904,20 @@ public class PokerEquityGUI extends JFrame {
 
                 boolean enRango;
                 if (heroPanel.isTextualSelected()) {
-                	String normalizada = HandUtils.to169(hand).toUpperCase(Locale.ROOT);
-                	enRango = RangeParser.parse(rango.toUpperCase(Locale.ROOT)).contains(normalizada);
+                    String normalizada = HandUtils.to169(hand).toUpperCase(Locale.ROOT);
+                    enRango = RangeParser.parse(rango.toUpperCase(Locale.ROOT)).contains(normalizada);
 
                 } else {
                     int pct = heroPanel.getPercentage();
                     enRango = RankingProvider.isInTopPercent(hand, pct);
                 }
 
-                // ✅ Solo colorea, no cambia la mano
                 hero.setBackground(enRango ? new Color(0, 130, 0) : new Color(130, 0, 0));
                 hero.repaint();
 
                 JOptionPane.showMessageDialog(PokerEquityGUI.this,
                         "Tu mano: " + hand.toString() + "\n" +
-                        (enRango ? "✅ Está dentro del rango." : "❌ Está fuera del rango."),
+                                (enRango ? "✅ Está dentro del rango." : "❌ Está fuera del rango."),
                         "Resultado de comprobación",
                         JOptionPane.INFORMATION_MESSAGE);
 
@@ -693,7 +927,6 @@ public class PokerEquityGUI extends JFrame {
                         "Error", JOptionPane.ERROR_MESSAGE);
             }
         }
-
 
         private String generarCartasConcretasDesdeNotacion(String notacion) {
             String[] palos = {"h", "d", "c", "s"};
@@ -714,12 +947,16 @@ public class PokerEquityGUI extends JFrame {
                     c2 = "" + r2 + p;
                 } else if (n.endsWith("O")) {
                     String p1 = palos[rand.nextInt(4)], p2;
-                    do { p2 = palos[rand.nextInt(4)]; } while (p1.equals(p2));
+                    do {
+                        p2 = palos[rand.nextInt(4)];
+                    } while (p1.equals(p2));
                     c1 = "" + r1 + p1;
                     c2 = "" + r2 + p2;
                 } else {
                     String p1 = palos[rand.nextInt(4)], p2;
-                    do { p2 = palos[rand.nextInt(4)]; } while (p1.equals(p2));
+                    do {
+                        p2 = palos[rand.nextInt(4)];
+                    } while (p1.equals(p2));
                     c1 = "" + r1 + p1;
                     c2 = "" + r2 + p2;
                 }
@@ -734,8 +971,13 @@ public class PokerEquityGUI extends JFrame {
         private void repartirCartas() {
             deck = new Deck();
             state.reset();
+            bettingState.reset();
             state.ensurePlayersCount(playerPanels.size());
             deck.removeCards(state.allUsedCards());
+
+            for (int i = 0; i < isFolded.length; i++) isFolded[i] = false;
+            turnoActual = 0;
+            lastEquities = Map.of();
 
             for (int i = 0; i < playerPanels.size(); i++) {
                 PlayerPanel pp = playerPanels.get(i);
@@ -750,6 +992,8 @@ public class PokerEquityGUI extends JFrame {
                 String c2 = drawUnique();
                 pp.setCards(c1 + c2);
                 state.setPlayerHand(i, new Hand(c1, c2));
+                pp.setBackground(UiTheme.BG_CARD);
+                pp.setBorder(BorderFactory.createLineBorder(i == 4 ? UiTheme.HERO_BORDER : UiTheme.BORDER, 3));
             }
 
             phase = Phase.PREFLOP;
@@ -758,8 +1002,8 @@ public class PokerEquityGUI extends JFrame {
 
             updateButtonsState();
             playerPanels.get(4).setBackground(UiTheme.BG_CARD);
-            updateEquities();
 
+            updateEquities();
             statusBar.setMessage("Cartas repartidas. Fase: PREFLOP");
             statusBar.setRight("Mazo restante: " + deck.remaining());
         }
@@ -768,15 +1012,16 @@ public class PokerEquityGUI extends JFrame {
             if (deck == null) return;
 
             if (!heroPanel.isRandomBoard()) {
-                onEditarBoard(); // abre el diálogo manual
+                onEditarBoard();
                 return;
             }
             if (phase == Phase.PREFLOP) {
                 deck.removeCards(state.allUsedCards());
                 String c1 = drawUnique(), c2 = drawUnique(), c3 = drawUnique();
                 state.getBoard().setFlop(c1, c2, c3);
-                
+
                 bettingState.newBettingRound();
+                turnoActual = 0;
 
                 phase = Phase.FLOP;
                 state.setPhase(phase);
@@ -799,8 +1044,9 @@ public class PokerEquityGUI extends JFrame {
                 deck.removeCards(state.allUsedCards());
                 String c4 = drawUnique();
                 state.getBoard().setTurn(c4);
-                
+
                 bettingState.newBettingRound();
+                turnoActual = 0;
 
                 phase = Phase.TURN;
                 state.setPhase(phase);
@@ -823,8 +1069,9 @@ public class PokerEquityGUI extends JFrame {
                 deck.removeCards(state.allUsedCards());
                 String c5 = drawUnique();
                 state.getBoard().setRiver(c5);
-                
+
                 bettingState.newBettingRound();
+                turnoActual = 0;
 
                 phase = Phase.RIVER;
                 state.setPhase(phase);
@@ -836,21 +1083,27 @@ public class PokerEquityGUI extends JFrame {
             }
         }
 
-
         private void reset() {
             phase = Phase.PREFLOP;
             state.reset();
-            bettingState.reset(); 
+            bettingState.reset();
             state.ensurePlayersCount(playerPanels.size());
             deck = null;
+
+            for (int i = 0; i < isFolded.length; i++) isFolded[i] = false;
+            turnoActual = 0;
+            allRangesReady = false;
+            lastEquities = Map.of();
 
             tablePanel.repaint();
             for (PlayerPanel pp : playerPanels) {
                 pp.reset();
-                pp.setBackground(UiTheme.BG_CARD); 
+                pp.setBackground(UiTheme.BG_CARD);
+                pp.setBorder(BorderFactory.createLineBorder(UiTheme.BORDER, 3));
             }
 
-
+            if (btnNextDecision != null) btnNextDecision.setEnabled(false);
+            marcarJugadorActivo(-1);
             updateButtonsState();
 
             statusBar.setMessage("Reiniciado.");
@@ -874,7 +1127,6 @@ public class PokerEquityGUI extends JFrame {
             BoardEditorDialog dlg = new BoardEditorDialog(PokerEquityGUI.this, state, deck);
             dlg.setVisible(true);
 
-            // Si guardó, BoardEditorDialog ya ajustó la fase y el mazo
             if (dlg.isSaved()) {
                 phase = state.getPhase();
                 tablePanel.repaint();
@@ -896,27 +1148,18 @@ public class PokerEquityGUI extends JFrame {
             return c;
         }
     }
-    
-    
-    // Helper para el flujo de turnos
-    private int obtenerPrimerJugadorActivo() {
-        // Preflop empieza UTG (3), Postflop empieza SB (1)
-        int start = (phase == Phase.PREFLOP) ? 3 : 1; 
-        for (int i = 0; i < 6; i++) {
-            int idx = (start + i) % 6;
-            if (state.getPlayers().get(idx) != null) return idx;
-        }
-        return -1; // Nadie juega
-    }
-    
+
     private void marcarJugadorActivo(int seat) {
         // Resetea bordes
-        for(PlayerPanel p : playerPanels) p.setBorder(BorderFactory.createLineBorder(UiTheme.BORDER, 3));
-        
+        for (PlayerPanel p : playerPanels) {
+            p.setBorder(BorderFactory.createLineBorder(UiTheme.BORDER, 3));
+        }
+
         if (seat >= 0 && seat < playerPanels.size()) {
-            // Marca visual para indicar turno [cite: 195] ("El primero en hablar...")
             playerPanels.get(seat).setBorder(BorderFactory.createLineBorder(Color.YELLOW, 4));
             statusBar.setRight("Turno de: " + playerPanels.get(seat).getPlayerName());
+        } else {
+            statusBar.setRight("");
         }
     }
 
@@ -926,5 +1169,4 @@ public class PokerEquityGUI extends JFrame {
     public static void main(String[] args) {
         SwingUtilities.invokeLater(PokerEquityGUI::new);
     }
-    
 }

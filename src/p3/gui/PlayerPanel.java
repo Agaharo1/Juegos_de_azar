@@ -21,6 +21,7 @@ import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
@@ -37,9 +38,13 @@ public class PlayerPanel extends JPanel {
     private JTextField rangeField;
     private JTextField emField;
 
-    // Colores de la Práctica 3
+    // Colores base de la Práctica 3
     private final Color COLOR_RANGO_BORDE = new Color(138, 43, 226); // Morado
-    private final Color COLOR_EM_BORDE = new Color(255, 165, 0);    // Naranja/Amarillo
+    private final Color COLOR_EM_BORDE    = new Color(255, 165, 0);  // Naranja/Amarillo
+
+    // Colores de estado OK / KO
+    private final Color COLOR_OK  = new Color(0, 130, 0);
+    private final Color COLOR_BAD = new Color(130, 0, 0);
 
     // Hooks separados
     private JButton editBtn;
@@ -47,7 +52,10 @@ public class PlayerPanel extends JPanel {
     private Runnable onEditHand;
     private Runnable onClearHand;
     private Runnable onEditRange; 
-    private Runnable onEditEM;    
+    private Runnable onEditEM;
+    private JCheckBox chkManual;
+    
+    public boolean isManual() { return chkManual != null && chkManual.isSelected(); }
 
     public PlayerPanel(String name, boolean isHero) {
         this.playerName = name;
@@ -194,6 +202,21 @@ public class PlayerPanel extends JPanel {
         actions.add(clearBtn);
         southContainer.add(actions);
 
+        // --- Nueva fila para opciones (Manual, etc.)
+        JPanel optionsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+        optionsPanel.setOpaque(false);
+
+        chkManual = new JCheckBox("Manual");
+        chkManual.setOpaque(false);
+        chkManual.setForeground(Color.WHITE);
+        chkManual.setFont(UiTheme.F_10B);
+
+        optionsPanel.add(chkManual);
+
+        southContainer.add(optionsPanel);
+
+
+
         add(southContainer, BorderLayout.SOUTH);
     }
     
@@ -202,7 +225,6 @@ public class PlayerPanel extends JPanel {
      */
     private void styleField(JTextField field, Color borderColor, int width, int height) {
         field.setFont(UiTheme.F_13B); 
-        
         field.setBackground(UiTheme.BG_INPUT);
         field.setForeground(UiTheme.FG_TEXT);
         field.setHorizontalAlignment(JTextField.CENTER);
@@ -219,6 +241,38 @@ public class PlayerPanel extends JPanel {
         label.setForeground(UiTheme.FG_TEXT_DIM);
     }
 
+    // =========================
+    //  MÉTODOS DE ESTADO VISUAL RG / EM
+    // =========================
+    /**
+     * @param ok  true → borde verde, false → borde rojo, null → borde morado por defecto
+     */
+    public void setRangeStatus(Boolean ok) {
+        if (rangeField == null) return;
+        if (ok == null) {
+            rangeField.setBorder(BorderFactory.createLineBorder(COLOR_RANGO_BORDE, 3));
+        } else {
+            rangeField.setBorder(BorderFactory.createLineBorder(ok ? COLOR_OK : COLOR_BAD, 3));
+        }
+        rangeField.repaint();
+    }
+
+    /**
+     * @param ok  true → borde verde, false → borde rojo, null → borde naranja por defecto
+     */
+    public void setEMStatus(Boolean ok) {
+        if (emField == null) return;
+        if (ok == null) {
+            emField.setBorder(BorderFactory.createLineBorder(COLOR_EM_BORDE, 3));
+        } else {
+            emField.setBorder(BorderFactory.createLineBorder(ok ? COLOR_OK : COLOR_BAD, 3));
+        }
+        emField.repaint();
+    }
+
+    // =========================
+    //  API PÚBLICA
+    // =========================
     public void setCards(String cards) {
         this.cards = cards == null ? "" : cards;
         cardsPanel.setCards(this.cards);
@@ -237,17 +291,22 @@ public class PlayerPanel extends JPanel {
         cards = "";
         cardsPanel.setCards("");
         equityField.setText("0.0%");
-        if (rangeField != null) rangeField.setText("");
-        if (emField != null) emField.setText("");
+        if (rangeField != null) {
+            rangeField.setText("");
+            setRangeStatus(null);  // Restaurar borde morado
+        }
+        if (emField != null) {
+            emField.setText("");
+            setEMStatus(null);     // Restaurar borde naranja
+        }
     }
 
     // Setters para los hooks y para el texto
-    
     public void setOnEditHand(Runnable r)  { this.onEditHand  = r; }
     public void setOnClearHand(Runnable r) { this.onClearHand = r; }
     
     public void setOnEditRange(Runnable r) { this.onEditRange = r; } 
-    public void setOnEditEM(Runnable r) { this.onEditEM = r; }      
+    public void setOnEditEM(Runnable r)    { this.onEditEM    = r; }      
 
     public void setRangeText(String text) {
         if (rangeField != null) {
@@ -283,7 +342,6 @@ public class PlayerPanel extends JPanel {
             repaint();
         }
         
-        // --- Lógica de dibujado de cartas (la que tenías originalmente) ---
         @Override protected void paintComponent(Graphics g) {
             super.paintComponent(g);
             if (cards != null && cards.length() >= 4) {
