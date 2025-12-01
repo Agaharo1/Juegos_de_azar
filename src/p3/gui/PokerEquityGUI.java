@@ -557,11 +557,7 @@ public class PokerEquityGUI extends JFrame {
     }
 
     private boolean validateRange(Hand hand, String rangoRaw) {
-
-    	
         if (rangoRaw == null || rangoRaw.isBlank()) return false;
-        
-        
 
         try {
             if (rangoRaw.endsWith("%") || rangoRaw.matches("\\d+(\\.\\d+)?")) {
@@ -569,10 +565,7 @@ public class PokerEquityGUI extends JFrame {
                 return RankingProvider.isInTopPercent(hand, pct);
             } else {
                 String h169 = HandUtils.to169(hand).toUpperCase(Locale.ROOT);
-
                 List<String> parsed = RangeParser.parse(rangoRaw.toUpperCase(Locale.ROOT));
-                
-                
                 return parsed.contains(h169);
             }
         } catch (Exception e) {
@@ -738,7 +731,7 @@ public class PokerEquityGUI extends JFrame {
                 case "NEXT_DECISION" -> procesarSiguienteJugador();
             }
         }
-        
+
         private void abrirDecisionManual(int seat) {
             PlayerPanel pp = playerPanels.get(seat);
             Hand hand = stateGetPlayerHand(seat);
@@ -781,9 +774,7 @@ public class PokerEquityGUI extends JFrame {
             }
         }
 
-
         private void tomarDecisionJugador(int seat) {
-
             PlayerPanel pp = playerPanels.get(seat);
             Hand hand = state.getPlayers().get(seat);
 
@@ -821,7 +812,6 @@ public class PokerEquityGUI extends JFrame {
                 statusBar.setMessage(pp.getPlayerName() + " hace BET (auto)");
             }
         }
-
 
         private void procesarSiguienteJugador() {
             if (!allRangesReady) {
@@ -897,7 +887,6 @@ public class PokerEquityGUI extends JFrame {
             TurnDecisionDialog dlg = new TurnDecisionDialog(PokerEquityGUI.this, heroCards, board4);
             dlg.setVisible(true);
         }
-
 
         private void onComprobarRango() {
             String rango;
@@ -1186,7 +1175,6 @@ public class PokerEquityGUI extends JFrame {
                 statusBar.setRight("Mazo restante: " + deck.remaining());
             }
         }
-
 
         private String drawUnique() {
             Set<String> used = new HashSet<>(state.allUsedCards());

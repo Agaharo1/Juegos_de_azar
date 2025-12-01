@@ -6,31 +6,33 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Gestiona el ranking de las 169 manos iniciales (aprox. Sklansky)
- * y ofrece utilidades para:
- *  1) Devolver el ranking completo (para la GUI actual).
- *  2) Devolver el top por porcentaje (0..1) como lista de manos.
- *  3) Construir una "máscara" [13][13][2] que indica qué manos están dentro
- *     del top, separando offsuit (índice 0) y suited (índice 1).
+ * RankingProvider gestiona el ranking estándar de 169 manos iniciales (Sklansky-like)
+ * y proporciona utilidades para:
  *
- * Nota sobre índices en la máscara:
- *  - Ejes 0..12 representan valores 2..A (ver RANKS = "23456789TJQKA").
- *  - [max][min][1] se usa para suited y [max][min][0] para offsuit.
- *  - Las parejas (AA, KK, ...) ocupan la diagonal [i][i] y se marcan en
- *    ambas capas [i][i][0] y [i][i][1] para simplificar.
+ *  1) Obtener la lista completa ordenada de las 169 manos.
+ *  2) Obtener el top X% de manos.
+ *  3) Construir una máscara [13][13][2] para visualización o lookup rápido.
+ *  4) Consultar si una mano concreta pertenece al top X%.
+ *
+ * Notación:
+ *  - RANKS = "23456789TJQKA" → índices 0..12
+ *  - Para suited: capa 1  (mask[hi][lo][1])
+ *  - Para offsuit: capa 0 (mask[hi][lo][0])
+ *  - Pares se marcan en ambas capas para simplificar.
  */
 public final class RankingProvider {
 
-    // Clase de utilidades: se evita crear instancias
     private RankingProvider() {}
 
-    // Ranking de 169 combinaciones (ordenadas de mejor a peor).
-    // Mezcla parejas, suited y offsuit. Es una aproximación suficiente para la práctica.
+    /** Orden de cartas: 2..A **/
+    private static final String RANKS = "23456789TJQKA";
+
+    /** Ranking completo de manos iniciales (169), de mejor a peor. */
     private static final String[] RANKING_169 = {
-            // PARES
+            // Pares
             "AA","KK","QQ","JJ","TT","99","88","77","66","55","44","33","22",
 
-            // SUITED FUERTES
+            // Suited fuertes
             "AKs","AQs","AJs","ATs","A9s","A8s","A7s","A6s","A5s","A4s","A3s","A2s",
             "KQs","KJs","KTs","K9s","K8s","K7s","K6s","K5s","K4s","K3s","K2s",
             "QJs","QTs","Q9s","Q8s","Q7s","Q6s","Q5s","Q4s","Q3s","Q2s",
@@ -44,7 +46,7 @@ public final class RankingProvider {
             "43s","42s",
             "32s",
 
-            // OFFSUIT
+            // Offsuited
             "AKo","AQo","AJo","ATo","A9o","A8o","A7o","A6o","A5o","A4o","A3o","A2o",
             "KQo","KJo","KTo","K9o","K8o","K7o","K6o","K5o","K4o","K3o","K2o",
             "QJo","QTo","Q9o","Q8o","Q7o","Q6o","Q5o","Q4o","Q3o","Q2o",
@@ -57,96 +59,104 @@ public final class RankingProvider {
             "54o","53o","52o",
             "43o","42o",
             "32o"
-        };
+    };
 
+    /* ---------------------------------------------------------
+     *                   API PÚBLICA
+     * --------------------------------------------------------- */
 
-    // Cadena para mapear letras de valor a índice 0..12 (2..A)
-    private static final String RANKS = "23456789TJQKA";
-
-    /**
-     * Devuelve una copia del ranking completo (169 elementos).
-     * Útil para compatibilidad con partes de la GUI que esperan una lista.
-     */
+    /** Devuelve una copia del ranking completo (169 manos). */
     public static List<String> getRanking() {
         return new ArrayList<>(Arrays.asList(RANKING_169));
     }
 
     /**
-     * Devuelve la lista de manos del top por porcentaje (0..1).
-     * Ejemplos:
-     *  - p = 0.25  → devuelve ~42 manos (el 25% superior).
-     *  - p = 1.0   → devuelve las 169 manos.
-     *  - p <= 0    → devuelve lista vacía.
+     * Devuelve el top por porcentaje.
+     * Acepta "p" como:
+     *  - 0..1  → porcentaje directo
+     *  - 0..100 → se interpreta como %
+     *  - >100 → se clampa a 100
      */
     public static List<String> getTopByPercent(double p) {
-    	if (p > 100) p = 100;
-    	if (p > 1) p /= 100.0;
 
-        int k = Math.min(RANKING_169.length, Math.max(0, (int)Math.ceil(RANKING_169.length * p)));
+        // Normalización robusta
+        if (p < 0) return Collections.emptyList();
+        if (p > 100) p = 100;
+        if (p > 1)   p /= 100.0;
+
+        int k = (int) Math.ceil(RANKING_169.length * p);
+        k = Math.max(0, Math.min(k, RANKING_169.length));
+
         if (k == 0) return Collections.emptyList();
-        ArrayList<String> top = new ArrayList<>(k);
-        for (int i = 0; i < k; i++) top.add(RANKING_169[i]);
-        return top;
+
+        List<String> out = new ArrayList<>(k);
+        for (int i = 0; i < k; i++) out.add(RANKING_169[i]);
+        return out;
     }
 
     /**
-     * Construye una máscara [13][13][2] marcando en true las manos dentro del top.
-     * - percent en 0..1 (igual que getTopByPercent).
-     * - Capa [..][..][1] = suited ; Capa [..][..][0] = offsuit.
-     * - Las parejas se marcan en ambas capas de su casilla diagonal.
+     * Devuelve una máscara [13][13][2] con el top marcado.
+     * mask[hi][lo][1] = suited
+     * mask[hi][lo][0] = offsuit
+     * Parejas → ambas capas para simplificar lookup.
      */
     public static boolean[][][] getMaskForPercent(double percent) {
         boolean[][][] mask = new boolean[13][13][2];
-        int limit = Math.min(RANKING_169.length, (int)Math.ceil(RANKING_169.length * percent));
+
+        // Normalizar igual que getTopByPercent
+        if (percent > 100) percent = 100;
+        if (percent > 1)   percent /= 100.0;
+
+        int limit = (int) Math.ceil(RANKING_169.length * percent);
+        limit = Math.max(0, Math.min(limit, RANKING_169.length));
+
         for (int i = 0; i < limit; i++) {
-            mark(mask, RANKING_169[i]);
+            markHand(mask, RANKING_169[i]);
         }
+
         return mask;
     }
-    
-    /**
-     * Devuelve true si una mano concreta está dentro del top por porcentaje dado.
-     * Usa HandUtils.to169() para convertir la mano real a su forma textual.
-     */
+
+    /** Consulta si una mano pertenece al top X% usando HandUtils.to169(). */
     public static boolean isInTopPercent(p3.model.Hand hand, double percent) {
         String normalized = HandUtils.to169(hand);
-        List<String> top = getTopByPercent(percent);
-        return top.contains(normalized);
+        return getTopByPercent(percent).contains(normalized);
     }
 
+    /* ---------------------------------------------------------
+     *                MÉTODOS PRIVADOS DE APOYO
+     * --------------------------------------------------------- */
 
-    // ======================
-    //    FUNCIONES APOYO
-    // ======================
+    /** Marca en la máscara la mano (AKs, AKo, TT…). */
+    private static void markHand(boolean[][][] mask, String hand) {
 
-    /**
-     * Marca en la máscara la mano dada (por ejemplo "AKs", "AQo" o "TT").
-     * Convierte las letras de valor a índices, detecta si es suited/offsuit/pareja
-     * y enciende la casilla correspondiente.
-     */
-    private static void mark(boolean[][][] mask, String hand) {
-        char r1 = hand.charAt(0);          // valor 1 (ej: 'A')
-        char r2 = hand.charAt(1);          // valor 2 (ej: 'K' o 'A' si pareja)
-        int i = RANKS.indexOf(r1);         // índice 0..12
-        int j = RANKS.indexOf(r2);         // índice 0..12
-        if (i < 0 || j < 0) return;        // seguridad: si algo raro, no marcamos
+        char r1 = hand.charAt(0);
+        char r2 = hand.charAt(1);
 
-        boolean suited  = hand.endsWith("s"); // termina en 's' → suited
-        boolean offsuit = hand.endsWith("o"); // termina en 'o' → offsuit
+        int i1 = RANKS.indexOf(r1);
+        int i2 = RANKS.indexOf(r2);
+        if (i1 < 0 || i2 < 0) return; // seguridad
 
-        // Para mantener una sola casilla por mano no pareja:
-        // usamos la convención [mayor][menor]
-        int hi = Math.max(i, j);
-        int lo = Math.min(i, j);
+        int hi = Math.max(i1, i2);
+        int lo = Math.min(i1, i2);
 
-        if (r1 == r2) {               // Pareja (diagonal)
-            mask[i][j][0] = true;     // marcamos ambas capas por simplicidad
-            mask[i][j][1] = true;
-        } else if (suited) {          // Mano suited → capa 1
-            mask[hi][lo][1] = true;
-        } else if (offsuit) {         // Mano offsuit → capa 0
-            mask[hi][lo][0] = true;
-        } else {                      // Sin sufijo: marcamos ambas (por si acaso)
+        boolean suited  = hand.endsWith("s");
+        boolean offsuit = hand.endsWith("o");
+        boolean pair    = (r1 == r2);
+
+        if (pair) {
+            // Parejas: marcar ambas capas en [i][i]
+            mask[i1][i2][0] = true;
+            mask[i1][i2][1] = true;
+            return;
+        }
+
+        if (suited) {
+            mask[hi][lo][1] = true; // capa suited
+        } else if (offsuit) {
+            mask[hi][lo][0] = true; // capa offsuit
+        } else {
+            // Sin especificar → marcamos ambas capas por compatibilidad
             mask[hi][lo][0] = true;
             mask[hi][lo][1] = true;
         }

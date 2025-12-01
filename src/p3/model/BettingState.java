@@ -1,119 +1,134 @@
 package p3.model;
 
 import java.util.Arrays;
-import java.util.List;
 
 /**
- * Mantiene el estado de las apuestas para los 6 jugadores en una ronda.
- * Simplifica la estructura de apuestas para la práctica.
+ * Gestiona el estado de apuestas de una ronda para 6 jugadores.
+ * Simplificación suficiente para la práctica:
+ *  - currentBet: apuesta máxima actual en esta ronda
+ *  - betsInRound[p]: contribución del jugador p en la ronda
+ *  - stacks[p]: fichas restantes del jugador p
+ *  - totalPot: acumulado histórico antes de la ronda actual
  */
 public class BettingState {
-    
-    // Stack inicial de fichas por jugador
-    public static final int STARTING_STACK = 2000;
 
-    // Apuesta mínima a la que se enfrenta el jugador (call/raise)
+    public static final int STARTING_STACK = 2000;
+    private static final int PLAYER_COUNT = 6;
+
+    /** Apuesta actual a la que deben igualar los jugadores. */
     private int currentBet = 0;
-    
-    // Lo que ha contribuido CADA JUGADOR al pozo en la ronda actual.
-    private final int[] betsInRound = new int[6]; 
-    
-    // Fichas totales de cada jugador
-    private final int[] stacks = new int[6];
-    
-    // Pozo total acumulado
+
+    /** Contribución de cada jugador en la ronda vigente. */
+    private final int[] betsInRound = new int[PLAYER_COUNT];
+
+    /** Fichas restantes de cada jugador. */
+    private final int[] stacks = new int[PLAYER_COUNT];
+
+    /** Pozo total acumulado antes de la ronda actual. */
     private int totalPot = 0;
 
+    // -------------------------------------------------------
+    //                   CONSTRUCTOR
+    // -------------------------------------------------------
     public BettingState() {
         Arrays.fill(stacks, STARTING_STACK);
     }
-    
+
+    // -------------------------------------------------------
+    //                   RESETEOS
+    // -------------------------------------------------------
+
+    /** Reinicia todo el estado del torneo. */
     public void reset() {
-        Arrays.fill(betsInRound, 0);
         Arrays.fill(stacks, STARTING_STACK);
+        Arrays.fill(betsInRound, 0);
         currentBet = 0;
         totalPot = 0;
     }
-    
+
     /**
-     * Resetea el estado de las apuestas para una nueva ronda (Flop, Turn, River).
-     * Las apuestas de la ronda anterior ya deberían haber pasado a totalPot.
+     * Comienza una nueva ronda de apuestas (Flop, Turn, River).
+     * Mueve lo acumulado en betsInRound al pozo y resetea apuestas de la nueva calle.
      */
     public void newBettingRound() {
-        // Mover las apuestas de la ronda anterior al pozo total (si hubiera una ronda anterior)
-        for (int bet : betsInRound) {
-            totalPot += bet;
-        }
+        for (int contrib : betsInRound) totalPot += contrib;
         Arrays.fill(betsInRound, 0);
         currentBet = 0;
     }
-    
-    // --- Getters y Setters ---
+
+    // -------------------------------------------------------
+    //                   GETTERS
+    // -------------------------------------------------------
 
     public int getCurrentBet() { return currentBet; }
     public int getTotalPot() { return totalPot; }
-    public int getStack(int playerIndex) { return stacks[playerIndex]; }
-    public int getBetInRound(int playerIndex) { return betsInRound[playerIndex]; }
-    
-    public int toCall(int playerIndex) {
-        return currentBet - betsInRound[playerIndex];
+    public int getStack(int p) { return stacks[p]; }
+    public int getBetInRound(int p) { return betsInRound[p]; }
+
+    /** Cantidad necesaria para igualar. Si <=0, se puede hacer check. */
+    public int toCall(int p) {
+        return currentBet - betsInRound[p];
     }
-    
-    public void setStacks(int index, int stack) { stacks[index] = stack; }
-    
+
+    public void setStacks(int p, int stack) {
+        stacks[p] = stack;
+    }
+
+    // -------------------------------------------------------
+    //                   ACCIONES
+    // -------------------------------------------------------
+
     /**
-     * Aplica la acción de apostar/subir.
-     * @param playerIndex Índice del jugador
-     * @param amountToRaise Cantidad que AÑADE encima de currentBet
-     * @return true si la acción es válida
+     * Acción de apostar/subir (raise).
+     *
+     * amountToRaise = cantidad EXTRA por encima de un call.
+     * El jugador pone: toCall(p) + amountToRaise.
+     *
+     * Devuelve true si la acción se completa.
      */
-    public boolean actionBet(int playerIndex, int amountToRaise) {
-        int amountToPutIn = toCall(playerIndex) + amountToRaise;
-        
-        if (amountToPutIn > stacks[playerIndex]) {
-            // All-in
-            amountToPutIn = stacks[playerIndex];
+    public boolean actionBet(int p, int amountToRaise) {
+        int callNeeded = toCall(p);
+        int totalToPut = callNeeded + amountToRaise;
+
+        if (totalToPut <= 0) return false;
+
+        // All-in si no llega
+        if (totalToPut > stacks[p]) {
+            totalToPut = stacks[p];
         }
-        
-        if (amountToPutIn <= 0) return false;
 
-        stacks[playerIndex] -= amountToPutIn;
-        betsInRound[playerIndex] += amountToPutIn;
-        currentBet = betsInRound[playerIndex]; 
-        
+        // Aplicar apuesta
+        stacks[p] -= totalToPut;
+        betsInRound[p] += totalToPut;
+
+        // Actualizar la apuesta máxima de la ronda
+        currentBet = betsInRound[p];
         return true;
     }
 
-    
     /**
-     * Aplica la acción de igualar la apuesta.
-     * @param playerIndex Índice del jugador
-     * @return true si la acción es válida
+     * Acción de igualar la apuesta (call).
+     * Si no hay diferencia, basta con check.
      */
-    public boolean actionCall(int playerIndex) {
-        int toPutIn = toCall(playerIndex);
-        if (toPutIn <= 0) return true; // Ya ha igualado o es Check
-        
-        // No puede ser más de lo que tiene
-        if (toPutIn > stacks[playerIndex]) toPutIn = stacks[playerIndex]; 
-        
-        stacks[playerIndex] -= toPutIn;
-        betsInRound[playerIndex] += toPutIn;
-        
+    public boolean actionCall(int p) {
+        int need = toCall(p);
+        if (need <= 0) return true; // check
+
+        // Ajustar a stack disponible
+        if (need > stacks[p]) need = stacks[p];
+
+        stacks[p] -= need;
+        betsInRound[p] += need;
         return true;
     }
-    
-    /**
-     * Simula la acción de Fold (no afecta a las apuestas, solo al GameState).
-     */
-    public void actionFold(int playerIndex) {
-        // Solo para claridad. La lógica de quitar la mano está en GameState/GUI.
+
+    /** Acción de Fold (no modifica apuestas; el GUI/estado externo gestiona la mano). */
+    public void actionFold(int p) {
+        // Fold sólo se registra fuera. Esta clase no elimina apuestas ya comprometidas.
     }
-    
-    /**
-     * Simula la acción de Check.
-     */
-    public void actionCheck(int playerIndex) {
-        // Solo posible si currentBet == betsInRound[playerIndex]
+
+    /** Acción de Check (siempre válido cuando toCall()==0). */
+    public void actionCheck(int p) {
+        // No hace nada: check ya está implícito si betsInRound[p]==currentBet.
     }
 }

@@ -7,21 +7,44 @@ import java.util.List;
 import p3.gui.Phase;
 
 /**
- * Estado mínimo del juego: manos de 6 jugadores + board + fase.
- * Siempre mantiene 6 posiciones (null si el asiento no tiene mano).
+ * Estado mínimo del juego:
+ *  - Manos de 6 jugadores (null = asiento vacío)
+ *  - Board (flop/turn/river)
+ *  - Fase actual
+ *  - Cartas foldeadas (no se reutilizan en el mazo)
+ *
+ * Siempre mantiene como mínimo 6 asientos.
  */
 public final class GameState {
+
+    /** Manos de los jugadores (índices 0..5). Puede contener nulls. */
     private final List<Hand> players = new ArrayList<>();
+
+    /** Board completo (flop/turn/river). */
     private final Board board = new Board();
+
+    /** Fase actual del juego. */
     private Phase phase = Phase.PREFLOP;
+
+    /** Cartas foldeadas (para mantener coherencia con el mazo). */
     private final List<String> foldedCards = new ArrayList<>();
 
-    /** Crea el estado con 6 slots iniciales en null. */
+
+    // ---------------------------------------------------------
+    //                    CONSTRUCTOR
+    // ---------------------------------------------------------
+
+    /** Estado inicial con 6 asientos vacíos. */
     public GameState() {
         ensureSize(6);
     }
 
-    /** Vuelve a estado inicial (6 nulls, board vacío, PREFLOP). */
+
+    // ---------------------------------------------------------
+    //                RESET Y CONFIGURACIÓN
+    // ---------------------------------------------------------
+
+    /** Reinicia completamente el estado (manos, board, fase, folded). */
     public void reset() {
         players.clear();
         ensureSize(6);
@@ -30,39 +53,66 @@ public final class GameState {
         foldedCards.clear();
     }
 
-    /** Define/actualiza la mano del jugador 'index' (0..5). Puede ser null. */
+    /** Garantiza que hay al menos n asientos (mínimo 6). */
+    public void ensurePlayersCount(int n) {
+        ensureSize(Math.max(6, n));
+    }
+
+    private void ensureSize(int size) {
+        while (players.size() < size) {
+            players.add(null);
+        }
+    }
+
+
+    // ---------------------------------------------------------
+    //                    MANOS DE JUGADORES
+    // ---------------------------------------------------------
+
+    /** Define o actualiza la mano del jugador index (0..5). Puede ser null. */
     public void setPlayerHand(int index, Hand hand) {
         ensureSize(Math.max(6, index + 1));
         players.set(index, hand);
     }
 
-    /** Acceso inmutable a la lista de 6 manos (puede contener nulls). */
+    /** Devuelve la lista INMUTABLE de manos (puede contener nulls). */
     public List<Hand> getPlayers() {
         return Collections.unmodifiableList(players);
     }
 
-    /** Acceso al board (flop/turn/river). */
+
+    // ---------------------------------------------------------
+    //                       BOARD
+    // ---------------------------------------------------------
+
     public Board getBoard() {
         return board;
     }
 
-    /** Fase actual. */
+
+    // ---------------------------------------------------------
+    //                       PHASE
+    // ---------------------------------------------------------
+
     public Phase getPhase() {
         return phase;
     }
 
-    /** Establece la fase actual. */
     public void setPhase(Phase p) {
         if (p == null) throw new IllegalArgumentException("Phase no puede ser null");
         this.phase = p;
     }
 
-    /** Garantiza que hay al menos 'n' posiciones (siempre 6 como mínimo). */
-    public void ensurePlayersCount(int n) {
-        ensureSize(Math.max(6, n));
-    }
 
-    /** Todas las cartas en juego (manos + board) como códigos "Ah","Kd"... */
+    // ---------------------------------------------------------
+    //               CARTAS EN JUEGO / CARTAS FOLDEADAS
+    // ---------------------------------------------------------
+
+    /**
+     * Devuelve todas las cartas actualmente en uso:
+     *  - Cartas de jugadores activos
+     *  - Cartas visibles del board
+     */
     public List<String> allUsedCards() {
         List<String> out = new ArrayList<>();
         for (Hand h : players) {
@@ -71,21 +121,19 @@ public final class GameState {
         out.addAll(board.visible());
         return out;
     }
-    
+
+    /** Devuelve copia inmutable de las cartas foldeadas. */
     public List<String> getFoldedCards() {
         return Collections.unmodifiableList(foldedCards);
     }
 
+    /** Añade al registro una mano foldeada completa (2 cartas). */
     public void addFoldedHand(Hand hand) {
         if (hand != null) foldedCards.addAll(hand.asList());
     }
 
+    /** Limpia la lista de cartas foldeadas. */
     public void clearFoldedCards() {
         foldedCards.clear();
-    }
-
-    // ---- helpers ----
-    private void ensureSize(int size) {
-        while (players.size() < size) players.add(null);
     }
 }

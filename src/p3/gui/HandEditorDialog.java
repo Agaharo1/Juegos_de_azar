@@ -1,143 +1,147 @@
 package p3.gui;
 
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.FlowLayout;
-import java.awt.Font;
-import java.awt.Window;
+import java.awt.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
-
-import javax.swing.BorderFactory;
-import javax.swing.JButton;
-import javax.swing.JDialog;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JTextField;
+import javax.swing.*;
 
 import p3.model.Hand;
 
 /**
- * Diálogo para editar manualmente la mano de un jugador.
- * – No depende de GameState ni Deck (se inyecta lógica por callbacks).
- * – Valida vía callback (en tu GUI ya compruebas colisiones con mesa y otros jugadores).
- * – UI: input "AhKd", mensaje de error, botones Guardar / Quitar mano / Cancelar.
+ * Diálogo genérico para editar una mano textual.
+ * Recibe callbacks para validar, guardar o limpiar la mano.
  */
 public class HandEditorDialog extends JDialog {
 
-    // ===== API de validación =====
+    // ------------ Resultado de validación ------------
+
     public static class ValidationResult {
         public final boolean ok;
-        public final Hand hand;       // mano parseada si ok
-        public final String message;  // error a mostrar si !ok
+        public final Hand hand;
+        public final String message;
 
         private ValidationResult(boolean ok, Hand hand, String message) {
-            this.ok = ok; this.hand = hand; this.message = message;
+            this.ok = ok;
+            this.hand = hand;
+            this.message = message;
         }
-        public static ValidationResult ok(Hand h)          { return new ValidationResult(true,  h, null); }
-        public static ValidationResult error(String msg)   { return new ValidationResult(false, null, msg); }
+
+        public static ValidationResult ok(Hand h)      { return new ValidationResult(true, h, null); }
+        public static ValidationResult error(String m) { return new ValidationResult(false, null, m); }
     }
 
-    private final JTextField tf = new JTextField(6);
-    private final JLabel error = new JLabel(" ");
+    // ------------ Atributos ------------
 
-    private final Function<String, ValidationResult> validator; // la pones desde PokerEquityGUI
-    private final Consumer<Hand> onSave;   // qué hacer al guardar (setPlayerHand, repaint, equities…)
-    private final Runnable onClear;        // qué hacer al quitar mano
+    private final JTextField tf = new JTextField(6);
+    private final JLabel errorLabel = new JLabel(" ");
+
+    private final Function<String, ValidationResult> validator;
+    private final Consumer<Hand> onSave;
+    private final Runnable onClear;
+
+    // ------------ Constructor ------------
 
     public HandEditorDialog(
             Window owner,
-            String titulo,
+            String title,
             String initialText,
             Function<String, ValidationResult> validator,
             Consumer<Hand> onSave,
             Runnable onClear
     ) {
-        super(owner, titulo, ModalityType.APPLICATION_MODAL);
+        super(owner, title, ModalityType.APPLICATION_MODAL);
         this.validator = validator;
         this.onSave = onSave;
         this.onClear = onClear;
 
         buildUI(initialText);
         setSize(360, 160);
-        setLocationRelativeTo(owner); // centrado sobre tu ventana principal
+        setLocationRelativeTo(owner);
     }
 
-    // ================= UI =================
-    private void buildUI(String initialText) {
+    // ------------ Construcción UI ------------
+
+    private void buildUI(String initial) {
         JPanel content = new JPanel(new BorderLayout(10, 10));
 
-        // Top: etiqueta + input
+        // ----- Zona superior -----
         JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
-        JLabel lbl = new JLabel("Introduce mano (ej: AhKd):");
-        tf.setText(initialText == null ? "" : initialText);
+        top.add(new JLabel("Introduce mano (ej: AhKd):"));
+
+        tf.setText(initial == null ? "" : initial);
         tf.setFont(new Font("Consolas", Font.PLAIN, 14));
-        tf.setColumns(6);
-        top.add(lbl);
         top.add(tf);
+
         content.add(top, BorderLayout.NORTH);
 
-        // Error
-        error.setForeground(new Color(200, 40, 40));
-        error.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        error.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 10));
-        content.add(error, BorderLayout.CENTER);
+        // ----- Zona error -----
+        errorLabel.setForeground(new Color(200, 40, 40));
+        errorLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        errorLabel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 10));
 
-        // Botones
+        content.add(errorLabel, BorderLayout.CENTER);
+
+        // ----- Botones -----
         JPanel btns = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 8));
-        JButton bSave   = new JButton("Guardar");
-        JButton bClear  = new JButton("Quitar mano");
-        JButton bCancel = new JButton("Cancelar");
+        JButton btnSave   = new JButton("Guardar");
+        JButton btnClear  = new JButton("Quitar mano");
+        JButton btnCancel = new JButton("Cancelar");
 
-        bSave.addActionListener(e -> onClickGuardar());
-        bClear.addActionListener(e -> onClickQuitar());
-        bCancel.addActionListener(e -> dispose());
+        btnSave.addActionListener(e -> handleSave());
+        btnClear.addActionListener(e -> handleClear());
+        btnCancel.addActionListener(e -> dispose());
 
-        btns.add(bClear);
-        btns.add(bCancel);
-        btns.add(bSave);
+        btns.add(btnClear);
+        btns.add(btnCancel);
+        btns.add(btnSave);
 
         content.add(btns, BorderLayout.SOUTH);
 
         setContentPane(content);
-        getRootPane().setDefaultButton(bSave);
+        getRootPane().setDefaultButton(btnSave);
     }
 
-    // ============== Lógica botones ==============
-    private void onClickGuardar() {
-        String raw = tf.getText() == null ? "" : tf.getText().trim();
+    // ------------ Acciones ------------
 
-        // Si no has pasado un validador, hacemos una validación mínima con Hand.fromString
-        ValidationResult vr;
-        if (validator != null) {
-            vr = validator.apply(raw);
-        } else {
-            vr = validateWithHandFromString(raw);
-        }
+    private void handleSave() {
+        String raw = safeText(tf);
+
+        ValidationResult vr = (validator != null)
+                ? validator.apply(raw)
+                : validateFallback(raw);
 
         if (!vr.ok) {
-            error.setText(vr.message == null ? "Entrada inválida." : vr.message);
+            errorLabel.setText(vr.message != null ? vr.message : "Entrada inválida.");
             return;
         }
+
         onSave.accept(vr.hand);
         dispose();
     }
 
-    private void onClickQuitar() {
+    private void handleClear() {
         onClear.run();
         dispose();
     }
 
-    // ============== Validación mínima por defecto ==============
-    private static ValidationResult validateWithHandFromString(String input) {
+    // ------------ Validación mínima por defecto ------------
+
+    private static ValidationResult validateFallback(String input) {
         String t = input.replaceAll("\\s+", "");
-        if (t.length() != 4) return ValidationResult.error("Usa 4 caracteres: AhKd, 7c7d, …");
+        if (t.length() != 4)
+            return ValidationResult.error("Usa 4 caracteres: AhKd, 7c7d…");
 
         try {
-            Hand h = Hand.fromString(t); // en tu modelo valida formato y cartas iguales
+            Hand h = Hand.fromString(t);
             return ValidationResult.ok(h);
         } catch (IllegalArgumentException ex) {
             return ValidationResult.error(ex.getMessage());
         }
+    }
+
+    // ------------ Utilidades ------------
+
+    private static String safeText(JTextField tf) {
+        return tf.getText() == null ? "" : tf.getText().trim();
     }
 }

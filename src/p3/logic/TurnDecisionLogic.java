@@ -1,95 +1,30 @@
 package p3.logic;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
+import java.util.*;
 import p3.model.Hand;
 
-public class TurnDecisionLogic {
+/**
+ * Lógica para el apartado 2.2 (Turn Decision):
+ * - Calcula outs medios del Hero contra un rango del Villano.
+ * - Evalúa equity aproximada en el Turn.
+ * - Aplica regla EM (equity mínima) para decidir CALL o FOLD.
+ */
+public final class TurnDecisionLogic {
 
-    private static final String[] SUITS = {"h", "d", "c", "s"};
+    private TurnDecisionLogic() {}
 
-    /**
-     * Calcula la media de outs del Hero contra el rango del Villano en el Turn.
-     * @param heroHand Mano del Hero (ej: "AhKh")
-     * @param villainRangeRaw Texto del rango (ej: "QQ+, AKs")
-     * @param board Cartas del board (deben ser 4)
-     * @return La media de outs.
-     */
-    public static double calculateAverageOuts(Hand heroHand, String villainRangeRaw, List<String> board) {
-        // 1. Validaciones básicas
-        if (board.size() != 4) return 0.0; // Solo funciona en Turn
-        
-        // Cartas ya conocidas (Hero + Board)
-        Set<String> deadCards = new HashSet<>(heroHand.asList());
-        deadCards.addAll(board);
+    private static final String[] SUITS = {"h","d","c","s"};
+    private static final String RANKS = "23456789TJQKA";
 
-        // 2. Expandir rango del villano a manos CONCRETAS (AhAd, etc.)
-        List<String> genericRange = RangeParser.parse(villainRangeRaw);
-        List<Hand> villainPossibleHands = expandRangeToSpecificHands(genericRange, deadCards);
+    // =====================================================================
+    //                         API PRINCIPAL
+    // =====================================================================
 
-        if (villainPossibleHands.isEmpty()) return 0.0;
-
-        // 3. Calcular outs contra cada mano posible del villano
-        long totalOuts = 0;
-
-        for (Hand villainHand : villainPossibleHands) {
-            totalOuts += countOuts(heroHand, villainHand, board, deadCards);
-        }
-
-        // 4. Calcular media aritmética [cite: 288]
-        return (double) totalOuts / villainPossibleHands.size();
-    }
-
-    private static int countOuts(Hand hero, Hand villain, List<String> board, Set<String> knownDead) {
-        // Cartas muertas para esta simulación específica (Hero + Board + Villano actual)
-        Set<String> currentDead = new HashSet<>(knownDead);
-        currentDead.addAll(villain.asList());
-
-        // Generar mazo restante (52 - 2 - 4 - 2 = 44 cartas) [cite: 301]
-        List<String> deck = new ArrayList<>();
-        String[] ranks = "23456789TJQKA".split("");
-        for (String r : ranks) {
-            for (String s : SUITS) {
-                String card = r + s;
-                if (!currentDead.contains(card)) {
-                    deck.add(card);
-                }
-            }
-        }
-
-        int outs = 0;
-        int ties = 0;
-
-        // Probar cada carta del River
-        for (String river : deck) {
-            List<String> finalBoard = new ArrayList<>(board);
-            finalBoard.add(river);
-
-            long scoreHero = PokerHandEvaluator.evaluate7(hero.card1(), hero.card2(), finalBoard);
-            long scoreVillain = PokerHandEvaluator.evaluate7(villain.card1(), villain.card2(), finalBoard);
-
-            if (scoreHero > scoreVillain) {
-                outs++; // Ganamos
-            } else if (scoreHero == scoreVillain) {
-                ties++; // Empate [cite: 308]
-            }
-        }
-        
-        // Empate cuenta como media out (o se reparte, simplificamos sumando ties y gestionando 0.5 fuera si se quiere)
-        // Según enunciado: "el empate se reparte de forma equitativa"
-        // Podemos devolver outs * 2 + ties para trabajar con enteros, o double.
-        // Trabajaremos con enteros redondeando ties:
-        return outs + (ties / 2); 
-    }
-    
+    /** Resultado empaquetado de la decisión. */
     public static class TurnDecisionResult {
-        public final double avgOuts;       // media de outs
-        public final double equityPercent; // equity aproximada en %
-
-        public final boolean call;         // true → CALL, false → FOLD
+        public final double avgOuts;
+        public final double equityPercent;
+        public final boolean call;
 
         public TurnDecisionResult(double avgOuts, double equityPercent, boolean call) {
             this.avgOuts = avgOuts;
@@ -97,83 +32,174 @@ public class TurnDecisionLogic {
             this.call = call;
         }
     }
+
     /**
-     * Calcula outs medios, equity aproximada y decisión CALL/FOLD
-     * según el EM introducido por el usuario.
-     *
-     * @param heroHand mano del Hero
-     * @param villainRangeRaw rango textual del villano (ej: "AA,QQ+,AKs")
-     * @param board 4 cartas del board en el Turn
-     * @param emPercent EM en porcentaje (ej: 30.0)
+     * Evaluación completa: outs medios + equity aproximada + decisión CALL/FOLD.
      */
-    public static TurnDecisionResult evaluateDecision(Hand heroHand,
-                                                      String villainRangeRaw,
-                                                      List<String> board,
-                                                      double emPercent) {
-        double avgOuts = calculateAverageOuts(heroHand, villainRangeRaw, board);
+    public static TurnDecisionResult evaluateDecision(
+            Hand heroHand,
+            String villainRangeRaw,
+            List<String> board4,
+            double emPercent) {
 
-        // En el Turn quedan 44 cartas posibles en el river (como en el enunciado).
-        double equity = (avgOuts / 44.0) * 100.0;
-
+        double avgOuts = calculateAverageOuts(heroHand, villainRangeRaw, board4);
+        double equity = (avgOuts / 44.0) * 100.0;     // Turn → 44 rivers posibles
         boolean call = avgOuts > emPercent;
 
         return new TurnDecisionResult(avgOuts, equity, call);
     }
 
+    /**
+     * Media de outs del Hero vs el rango del Villano en el Turn.
+     * El empate se reparte 50/50.
+     */
+    public static double calculateAverageOuts(
+            Hand heroHand,
+            String villainRangeRaw,
+            List<String> board4) {
 
-    // --- Expansión de combinaciones ---
+        if (board4 == null || board4.size() != 4) return 0.0;
 
-    private static List<Hand> expandRangeToSpecificHands(List<String> genericRange, Set<String> deadCards) {
-        List<Hand> concreteHands = new ArrayList<>();
+        Set<String> dead = new HashSet<>(heroHand.asList());
+        dead.addAll(board4);
 
-        for (String gen : genericRange) { // gen es "AA", "AKs", "AKo"
-            if (gen.length() < 2) continue;
-            
-            char r1 = gen.charAt(0);
-            char r2 = gen.charAt(1);
-            boolean isPair = (r1 == r2);
-            boolean isSuited = gen.endsWith("s");
-            boolean isOffsuit = gen.endsWith("o");
+        // Rango textual → lista de manos 169 → combinación a manos concretas
+        List<String> tokens = RangeParser.parse(villainRangeRaw);
+        List<Hand> villainHands = expandToSpecificHands(tokens, dead);
 
-            if (isPair) {
-                // Generar 6 pares: hd, hc, hs, dc, ds, cs
-                for (int i = 0; i < SUITS.length; i++) {
-                    for (int j = i + 1; j < SUITS.length; j++) {
-                        tryAddHand(concreteHands, "" + r1 + SUITS[i], "" + r2 + SUITS[j], deadCards);
-                    }
-                }
-            } else if (isSuited) {
-                // Generar 4 suited: hh, dd, cc, ss
-                for (String s : SUITS) {
-                    tryAddHand(concreteHands, "" + r1 + s, "" + r2 + s, deadCards);
-                }
-            } else if (isOffsuit) {
-                // Generar 12 offsuit
-                for (String s1 : SUITS) {
-                    for (String s2 : SUITS) {
-                        if (!s1.equals(s2)) {
-                            tryAddHand(concreteHands, "" + r1 + s1, "" + r2 + s2, deadCards);
-                        }
-                    }
-                }
-            } else {
-                // Si viene sin sufijo (ej "AK"), asumimos que puede ser suited u offsuit (16 combinaciones)
-                 for (String s1 : SUITS) {
-                    for (String s2 : SUITS) {
-                         if (r1 == r2 && s1.equals(s2)) continue; // No AAhh
-                         tryAddHand(concreteHands, "" + r1 + s1, "" + r2 + s2, deadCards);
-                    }
-                }
-            }
-        }
-        return concreteHands;
+        if (villainHands.isEmpty()) return 0.0;
+
+        long total = 0;
+        for (Hand v : villainHands)
+            total += countOuts(heroHand, v, board4, dead);
+
+        return (double) total / villainHands.size();
     }
 
-    private static void tryAddHand(List<Hand> list, String c1, String c2, Set<String> dead) {
-        if (!dead.contains(c1) && !dead.contains(c2)) {
-            try {
-                list.add(new Hand(c1, c2));
-            } catch (Exception ignored) {}
+    // =====================================================================
+    //                         CÁLCULO DE OUTS
+    // =====================================================================
+
+    /** Cuenta outs del Hero contra una mano concreta del Villano. */
+    private static int countOuts(
+            Hand hero,
+            Hand villain,
+            List<String> board4,
+            Set<String> globalDead) {
+
+        // Dead cards específicos (Hero + Board + esa mano de Villano)
+        Set<String> dead = new HashSet<>(globalDead);
+        dead.addAll(villain.asList());
+
+        // Construir mazo restante
+        List<String> deck = buildRemainingDeck(dead);
+
+        int wins = 0;
+        int ties = 0;
+
+        // Cada posible river
+        for (String river : deck) {
+            List<String> board5 = new ArrayList<>(board4);
+            board5.add(river);
+
+            long h = PokerHandEvaluator.evaluate7(hero.card1(), hero.card2(), board5);
+            long v = PokerHandEvaluator.evaluate7(villain.card1(), villain.card2(), board5);
+
+            if (h > v) wins++;
+            else if (h == v) ties++;
         }
+
+        // Empates cuentan medio
+        return wins + ties / 2;
+    }
+
+    /** Devuelve todas las cartas posibles excluyendo las dead. */
+    private static List<String> buildRemainingDeck(Set<String> dead) {
+        List<String> deck = new ArrayList<>(44);
+
+        for (int i = 0; i < RANKS.length(); i++) {
+            char r = RANKS.charAt(i);
+            for (String s : SUITS) {
+                String c = "" + r + s;
+                if (!dead.contains(c)) deck.add(c);
+            }
+        }
+        return deck;
+    }
+
+    // =====================================================================
+    //                   EXPANSIÓN DEL RANGO A MANOS CONCRETAS
+    // =====================================================================
+
+    /** Convierte manos "AKs", "QQ", "T9o" en combinaciones reales AhKh, KsKd, etc. */
+    private static List<Hand> expandToSpecificHands(
+            List<String> tokens,
+            Set<String> dead) {
+
+        List<Hand> out = new ArrayList<>();
+
+        for (String t : tokens) {
+            if (t.length() < 2) continue;
+
+            char r1 = t.charAt(0);
+            char r2 = t.charAt(1);
+            boolean pair = r1 == r2;
+            boolean suited = t.endsWith("s");
+            boolean offsuit = t.endsWith("o");
+
+            if (pair) {
+                expandPairs(out, r1, dead);
+            } else if (suited) {
+                expandSuited(out, r1, r2, dead);
+            } else if (offsuit) {
+                expandOffsuit(out, r1, r2, dead);
+            } else {
+                expandNoSuffix(out, r1, r2, dead);
+            }
+        }
+        return out;
+    }
+
+    /** Parejas → 6 combinaciones. */
+    private static void expandPairs(List<Hand> out, char r, Set<String> dead) {
+        for (int i = 0; i < 4; i++)
+            for (int j = i + 1; j < 4; j++)
+                tryAdd(out, "" + r + SUITS[i], "" + r + SUITS[j], dead);
+    }
+
+    /** Suited → 4 combinaciones. */
+    private static void expandSuited(List<Hand> out, char r1, char r2, Set<String> dead) {
+        for (String s : SUITS)
+            tryAdd(out, "" + r1 + s, "" + r2 + s, dead);
+    }
+
+    /** Offsuit → 12 combinaciones. */
+    private static void expandOffsuit(List<Hand> out, char r1, char r2, Set<String> dead) {
+        for (String s1 : SUITS)
+            for (String s2 : SUITS)
+                if (!s1.equals(s2))
+                    tryAdd(out, "" + r1 + s1, "" + r2 + s2, dead);
+    }
+
+    /** Sin sufijo → 16 combinaciones posibles. */
+    private static void expandNoSuffix(List<Hand> out, char r1, char r2, Set<String> dead) {
+        for (String s1 : SUITS)
+            for (String s2 : SUITS)
+                tryAdd(out, "" + r1 + s1, "" + r2 + s2, dead);
+    }
+
+    /** Intenta registrar la mano, ignorando colisiones e inválidas. */
+    private static void tryAdd(
+            List<Hand> out,
+            String c1,
+            String c2,
+            Set<String> dead) {
+
+        if (dead.contains(c1) || dead.contains(c2)) return;
+        if (c1.equals(c2)) return;
+
+        try {
+            out.add(new Hand(c1, c2));
+        } catch (Exception ignored) {}
     }
 }
