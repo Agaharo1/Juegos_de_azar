@@ -6,142 +6,196 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * RangeParser amplía el soporte de rangos textuales.
- * Permite expresiones como:
- *  - JJ+           -> JJ,QQ,KK,AA
- *  - T2s+          -> T2s,T3s,...,T9s
- *  - 52o+          -> 52o,53o,...,T9o
- *  - ATs-A2s       -> ATs,A9s,A8s,...,A2s
- *  - QQ-AA         -> QQ,KK,AA
- *  - Mezclas: JJ+,ATs-A8s,76o,54o
+ * RangeParser convierte expresiones de rango como:
+ *
+ *   JJ+
+ *   T2s+
+ *   52o+
+ *   ATs-A2s
+ *   QQ-AA
+ *   JJ+,ATs-A8s,76o,54o
+ *
+ * en una lista de manos individuales en notación 169 (AA, AKs, QJo…).
+ *
+ * Reglas:
+ *  - "+" expande hacia arriba (JJ+ → JJ,QQ,KK,AA).
+ *  - "-" expande rangos crecientes dentro de la categoría indicada.
+ *  - Ambos soportan suited 's', offsuit 'o' y parejas.
  */
-public class RangeParser {
+public final class RangeParser {
 
     private static final String RANKS = "23456789TJQKA";
 
-    /** Validación simple del formato del rango textual básico. */
+    private RangeParser() {}
+
+    /* =============================================================
+     *                   VALIDACIÓN BÁSICA
+     * ============================================================= */
+
+    /** Comprueba si el formato es compatible con el parser. */
     public static boolean isBasicFormat(String input) {
         if (input == null) return false;
-        // Permite tokens como JJ+, ATs-A2s, QQ-AA, además de los básicos
+
+        // Token típico: "JJ+", "ATs-A2s", "QQ-AA", "AKo"
         String token = "([2-9TJQKA]{2}[so]?([+-][2-9TJQKA]{0,2}[so]?)?)";
+
         String regex = "^\\s*" + token + "(\\s*,\\s*" + token + ")*\\s*$";
         return input.trim().matches(regex);
     }
 
 
+    /* =============================================================
+     *                       PARSING GENERAL
+     * ============================================================= */
+
     /**
-     * Parsea un rango textual (como "JJ+,ATs-A8s,76o,54o") a una lista de manos individuales.
+     * Parsea un rango textual como "JJ+,ATs-A8s,76o".
+     * Devuelve manos individuales en notación textual (169).
      */
     public static List<String> parse(String rango) {
-        if (rango == null || rango.isBlank()) return Collections.emptyList();
+        if (rango == null || rango.isBlank())
+            return Collections.emptyList();
 
-        List<String> manos = new ArrayList<>();
+        List<String> result = new ArrayList<>();
+
         for (String token : rango.split(",")) {
             token = token.trim().toUpperCase(Locale.ROOT);
             if (token.isEmpty()) continue;
 
             if (token.endsWith("+")) {
-                manos.addAll(expandPlus(token));
+                result.addAll(expandPlus(token));
             } else if (token.contains("-")) {
-                manos.addAll(expandRange(token));
+                result.addAll(expandDash(token));
             } else {
-                manos.add(token);
+                result.add(token);
             }
         }
-        return manos;
+
+        return result;
     }
 
-    /** Expande los tokens con '+' como JJ+, T2s+, 52o+ */
-    private static List<String> expandPlus(String token) {
-        List<String> result = new ArrayList<>();
-        token = token.substring(0, token.length() - 1); // eliminar '+'
 
-        // --- Pares: JJ+ -> JJ,QQ,KK,AA ---
-        if (token.length() == 2 && token.charAt(0) == token.charAt(1)) {
+    /* =============================================================
+     *                       EXPANSIÓN "+"
+     * ============================================================= */
+
+    /** Expande tokens con '+' como "JJ+", "T2s+", "52o+". */
+    private static List<String> expandPlus(String token) {
+        List<String> out = new ArrayList<>();
+
+        // Remove "+"
+        token = token.substring(0, token.length() - 1);
+
+        // Pares
+        if (isPair(token)) {
             char start = token.charAt(0);
             int idx = RANKS.indexOf(start);
+
             for (int i = idx; i < RANKS.length(); i++) {
-                result.add("" + RANKS.charAt(i) + RANKS.charAt(i));
+                out.add("" + RANKS.charAt(i) + RANKS.charAt(i));
             }
-            return result;
+            return out;
         }
 
-        // --- No pareja: T2s+, 52o+ ---
+        // No parejas: T2s+, 52o+, etc.
         char high = token.charAt(0);
         char low = token.charAt(1);
         char type = token.charAt(2); // 's' o 'o'
 
         int idxHigh = RANKS.indexOf(high);
-        int idxLow = RANKS.indexOf(low);
+        int idxLow  = RANKS.indexOf(low);
 
-        // Por convenio: misma primera carta, subir la segunda hasta una por debajo de la alta
-        for (int i = idxLow; i <= idxHigh-1; i++) {
-            result.add("" + high + RANKS.charAt(i) + type);
+        // Ejemplo: T2s+ → T2s, T3s, ..., T9s
+        for (int i = idxLow; i < idxHigh; i++) {
+            out.add("" + high + RANKS.charAt(i) + type);
         }
-        return result;
+
+        return out;
     }
 
-    /** Determina si el rango con '-' es de parejas o no, y delega. */
-    private static List<String> expandRange(String token) {
-        List<String> result = new ArrayList<>();
+
+    /* =============================================================
+     *                       EXPANSIÓN "-"
+     * ============================================================= */
+
+    /** Expande rangos con "-" como "QQ-AA" o "ATs-A2s". */
+    private static List<String> expandDash(String token) {
+        List<String> out = new ArrayList<>();
+
         String[] parts = token.split("-");
-        if (parts.length != 2) return result;
+        if (parts.length != 2)
+            return out;
 
-        String start = parts[0].trim();
-        String end = parts[1].trim();
+        String a = parts[0].trim();
+        String b = parts[1].trim();
 
-        // Pares (QQ-AA)
-        if (isPair(start) && isPair(end)) {
-            return expandPairRange(start, end);
-        }
+        // Rango de parejas
+        if (isPair(a) && isPair(b))
+            return expandPairRange(a, b);
 
-        // No pareja (ATs-A2s, KQo-KTo, etc.)
-        return expandNonPairRange(start, end);
+        // Rango no pareja
+        return expandNonPairRange(a, b);
     }
 
-    /** Expande un rango de parejas (por ejemplo QQ-AA). */
+
+    /* =============================================================
+     *              EXPANSIÓN RANGOS PAREJA (QQ-AA)
+     * ============================================================= */
+
     private static List<String> expandPairRange(String start, String end) {
-        List<String> result = new ArrayList<>();
+        List<String> out = new ArrayList<>();
+
         int i1 = RANKS.indexOf(start.charAt(0));
         int i2 = RANKS.indexOf(end.charAt(0));
 
-        // Asegurar que se recorra en orden creciente
         if (i1 > i2) {
-            int tmp = i1;
-            i1 = i2;
-            i2 = tmp;
+            int tmp = i1; i1 = i2; i2 = tmp;
         }
 
         for (int i = i1; i <= i2; i++) {
-            result.add("" + RANKS.charAt(i) + RANKS.charAt(i));
+            out.add("" + RANKS.charAt(i) + RANKS.charAt(i));
         }
-        return result;
+
+        return out;
     }
 
-    /** Expande un rango no pareja (ATs-A2s, KQo-KTo). */
+
+    /* =============================================================
+     *           EXPANSIÓN RANGOS NO PAREJA (ATs-A2s)
+     * ============================================================= */
+
     private static List<String> expandNonPairRange(String start, String end) {
-        List<String> result = new ArrayList<>();
+        List<String> out = new ArrayList<>();
 
-        char high = start.charAt(0);
-        char type = start.charAt(2); // s / o
-        int i1 = RANKS.indexOf(start.charAt(1));
-        int i2 = RANKS.indexOf(end.charAt(1));
+        // Ej: ATs → A,T,s
+        char highStart = start.charAt(0);
+        char lowStart  = start.charAt(1);
+        char type      = start.charAt(2); // 's' o 'o'
 
-        if (i1 < 0 || i2 < 0) return result;
-        // Ordenar índices (por si vienen invertidos)
+        char lowEnd = end.charAt(1);
+
+        int i1 = RANKS.indexOf(lowStart);
+        int i2 = RANKS.indexOf(lowEnd);
+
+        if (i1 < 0 || i2 < 0)
+            return out;
+
         if (i1 > i2) {
-            int tmp = i1;
-            i1 = i2;
-            i2 = tmp;
+            int tmp = i1; i1 = i2; i2 = tmp;
         }
 
         for (int i = i1; i <= i2; i++) {
-            result.add("" + high + RANKS.charAt(i) + type);
+            out.add("" + highStart + RANKS.charAt(i) + type);
         }
-        return result;
+
+        return out;
     }
 
-    /** Devuelve true si la mano es pareja (como "TT", "QQ", "AA"). */
+
+    /* =============================================================
+     *                        UTILIDADES
+     * ============================================================= */
+
     private static boolean isPair(String token) {
         return token.length() == 2 && token.charAt(0) == token.charAt(1);
     }

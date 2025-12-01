@@ -1,30 +1,45 @@
 package p3.gui;
 
 import java.awt.BorderLayout;
-
 import javax.swing.BorderFactory;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 
+/**
+ * Barra de estado inferior con dos zonas:
+ *  - Mensaje a la izquierda (estado general)
+ *  - Mensaje contextual a la derecha (información de apoyo)
+ */
 public class StatusBar extends JPanel {
-    private final JLabel left = new JLabel("Listo.");
-    private final JLabel right = new JLabel("");
+
+    private final JLabel leftLabel  = new JLabel("Listo.");
+    private final JLabel rightLabel = new JLabel("");
 
     public StatusBar() {
         setLayout(new BorderLayout());
         setBackground(UiTheme.BG_PANEL);
-        setBorder(BorderFactory.createMatteBorder(1,0,0,0, UiTheme.BORDER));
+        setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, UiTheme.BORDER));
 
-        left.setForeground(UiTheme.FG_TEXT_DIM);
-        left.setFont(UiTheme.F_10);
+        styleLabel(leftLabel);
+        styleLabel(rightLabel);
 
-        right.setForeground(UiTheme.FG_TEXT_DIM);
-        right.setFont(UiTheme.F_10);
-
-        add(left, BorderLayout.WEST);
-        add(right, BorderLayout.EAST);
+        add(leftLabel, BorderLayout.WEST);
+        add(rightLabel, BorderLayout.EAST);
     }
 
-    public void setMessage(String msg) { left.setText(msg); }
-    public void setRight(String msg)   { right.setText(msg); }
+    /** Aplica formato estándar de la aplicación a las etiquetas. */
+    private void styleLabel(JLabel label) {
+        label.setForeground(UiTheme.FG_TEXT_DIM);
+        label.setFont(UiTheme.F_10);
+    }
+
+    /** Muestra un mensaje principal (lado izquierdo). */
+    public void setMessage(String msg) {
+        leftLabel.setText(msg != null ? msg : "");
+    }
+
+    /** Muestra información auxiliar (lado derecho). */
+    public void setRight(String msg) {
+        rightLabel.setText(msg != null ? msg : "");
+    }
 }
