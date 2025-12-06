@@ -1,132 +1,319 @@
-# Proyecto: Juegos de Azar - Práctica 3 🎲♠️♥️♣️♦️
+# Poker Equity Calculator Juegos de Azar ♠️♥️♣️♦️
 
-Este repositorio contiene el desarrollo de la **Práctica 3** de la asignatura *Herramientas Informáticas para Juegos de Azar*, centrada en la **toma de decisiones en el póker Texas Hold’em**.  
-El proyecto está desarrollado en **Java**, bajo el patrón **MVC (Modelo–Vista–Controlador)**, e implementa una interfaz gráfica en **Swing**.
+**Texas Hold’em Decision Simulator** – Java + Swing + MVC
+
+Este repositorio contiene el desarrollo completo de la **Práctica 3** de la asignatura *Herramientas Informáticas para Juegos de Azar*, centrada en:
+
+* el **cálculo de equity** en Texas Hold’em,
+* la **toma de decisiones automática** basada en rangos y equity mínima,
+* la simulación de acciones durante una mano,
+* y el análisis de decisión en el **Turn (outs medios)**.
+
+El proyecto está implementado en **Java 17**, con arquitectura **MVC** y una interfaz gráfica en **Swing**, incluyendo un evaluador de manos completo, un motor de simulación Monte Carlo y un sistema gráfico interactivo para 6 jugadores.
 
 ---
 
-## 📂 Estructura general del proyecto
+# 🧭 Índice
+
+1. [Características principales](#-características-principales)
+2. [Arquitectura del proyecto (MVC)](#-arquitectura-del-proyecto-mvc)
+3. [Estructura del repositorio](#-estructura-del-repositorio)
+4. [Funcionamiento del sistema](#-funcionamiento-del-sistema)
+5. [Cálculo de equity (Internals)](#-cálculo-de-equity-internals)
+6. [Rangos, EM y decisiones automáticas](#-rangos-em-y-decisiones-automáticas)
+7. [Decisión en el Turn – Outs medios](#-decisión-en-el-turn--outs-medios)
+8. [Compilación y ejecución](#-compilación-y-ejecución)
+10. [Autoría](#-autoría)
+
+---
+
+# ⭐ Características principales
+
+✔️ Simulación de mesa **6-max** con interfaz gráfica interactiva
+
+✔️ Cálculo de **equity real** mediante Monte Carlo o **PokerStove** si está disponible
+
+✔️ Sistema de **rangos textuales** y **rangos por porcentaje**
+
+✔️ Evaluador completo de manos de Texas Hold’em
+
+✔️ Motor de apuestas simplificado (Bet, Call, Fold)
+
+✔️ Sistema de **decisión automática** basado en RG + EM
+
+✔️ Editor manual de board (Flop/Turn/River)
+
+✔️ Modo análisis para el **Turn (outs medios)**
+
+✔️ Interfaz moderna con tema oscuro y cartas gráficas
+
+---
+
+# 🧱 Arquitectura del proyecto (MVC)
+
+## 🖥️ Vista — `p3.gui`
+
+* **PokerEquityGUI** → Ventana principal
+  Dibuja la mesa, gestiona eventos, botones, players, board y fases.
+
+* **PlayerPanel**
+  Muestra cartas, equity, RG/EM, botones de edición, y modo manual.
+
+* **HeroPanel**
+  Rango textual, rango por porcentaje, random board/cards, etc.
+
+* **TurnDecisionDialog**
+  Análisis del apartado 2.2: outs medios + CALL/FOLD.
+
+* **BoardEditorDialog**
+  Editor manual del flop/turn/river.
+
+* **CardImages** + **UiTheme**
+  Carga de imágenes PNG + paleta de colores + tipografías UI.
+
+---
+
+## ⚙️ Lógica — `p3.logic`
+
+* **PokerHandEvaluator**
+  Evalúa una mano de 7 cartas mediante combinaciones de 5.
+  Soporta:
+
+  * Escaleras, flush, full, póker, straight flush, wheel…
+
+* **RealEquityCalculator**
+  Monte Carlo mejorado:
+
+  * Completa manos/board desconocidos.
+  * Evalúa todas las manos en cada simulación.
+  * Reparte victorias y empates.
+
+* **PokerStoveAdapter**
+  Llama a `ps-eval.exe` si existe; si falla → fallback automático a Monte Carlo.
+
+* **RangeParser**
+  Interpreta rangos como:
+
+  ```
+  JJ+, ATs-A2s, 76o+, QQ-AA, AKs, AQo
+  ```
+
+* **RankingProvider**
+  Ranking estándar de 169 manos Sklansky-like:
+
+  * `getTopByPercent(25)` → top 25%
+
+* **TurnDecisionLogic**
+  Calcula outs medios vs rango y decide CALL/FOLD.
+
+---
+
+## 📊 Modelo — `p3.model`
+
+* **GameState**
+  Mantiene:
+
+  * manos de los 6 jugadores
+  * board
+  * fase (PREFLOP/FLOP/TURN/RIVER)
+  * tracking de cartas usadas y foldeadas
+
+* **BettingState**
+  Sistema simplificado de apuestas:
+
+  * currentBet
+  * stacks
+  * betsInRound
+  * totalPot
+  * acciones: `call`, `bet`, `check`, `fold`
+
+* **Hand** / **Board** / **CardValidator**
+
+---
+
+# 📂 Estructura del repositorio
 
 ```bash
-HJA/
+Práctica3/
 ├── src/
-│   └── tp3/
-│       ├── gui/      # Interfaz gráfica (Swing)
-│       ├── logic/    # Lógica del juego (equity, decisiones, evaluador, etc.)
-│       ├── model/    # Estado del juego (jugadores, manos, board, fases)
+│   └── p3/
+│       ├── gui/        # Interfaz gráfica
+│       ├── logic/      # Evaluador, equity, rangos, decisiones
+│       ├── model/      # Estado del juego y cartas
 │
 ├── resources/
-│   └── cartas/       # Imágenes PNG de las cartas (Ah.png, Kd.png, etc.)
+│   └── cartas/         # Ah.png, Kd.png, red_joker.png, etc.
 │
-├── bin/              # Archivos compilados (.class)
-├── .gitignore
-├── .project / .classpath
-└── README.md
+├── bin/                # .class compilados
+├── README.md
+└── .gitignore
 ```
 
 ---
 
-## 🧱 Arquitectura (MVC)
+# 🔁 Funcionamiento del sistema
 
-### 🖥️ Vista (`tp3.gui`)
+## 1. Deal
 
-* `PokerEquityGUI`: ventana principal del juego, con tablero, jugadores y control de fases.
-* `HeroPanel`: controles del jugador principal (rango, porcentaje, equity mínimo).
-* `PlayerPanel`: muestra nombre, cartas, equity y acción (Bet, Call, Fold).
-* `StatusBar`: muestra información contextual (fase, cartas restantes, acciones).
-* `UiTheme` y `CardImages`: definen los colores, tipografía y carga de imágenes.
+* Se crea un `Deck`.
+* Se resetea `GameState` y `BettingState`.
+* Se reparten manos (aleatorias salvo el héroe si se desactiva "Random Cards").
 
-### ⚙️ Lógica (`tp3.logic`)
+## 2. Establecer rangos (RG) y equity mínima (EM)
 
-* `PokerHandEvaluator`: evalúa la fuerza de manos de 7 cartas.
-* `RealEquityCalculator`: calcula la **equity real** mediante simulación Monte Carlo.
-* `RangeParser` y `RankingProvider`: interpretan rangos y rankings por porcentaje.
-* `DecisionEngine`: nuevo módulo para determinar acciones (Bet, Call, Fold) en base a equity mínima.
-* `RoundManager`: gestiona las fases del juego y las decisiones automáticas.
-* `OutsCalculator`: calcula **outs medios** contra el rango de un rival.
+* Cada jugador debe tener RG + EM para activar la toma de decisiones.
+* La GUI colorea en **verde** si la mano cumple RG/EM y **rojo** si no.
 
-### 📊 Modelo (`tp3.model`)
+## 3. Cálculo automático de equity
 
-* `Hand`: representa una mano de dos cartas.
-* `Board`: representa las cartas comunes (flop, turn, river).
-* `GameState`: estado general del juego (jugadores activos, board y fase).
-* `Phase`: enum con las fases (`PREFLOP`, `FLOP`, `TURN`, `RIVER`).
-* `CardValidator`: valida el formato de las cartas.
+El número de simulaciones depende de la fase:
 
----
+| Fase    | Simulaciones     |
+| ------- | ---------------- |
+| Preflop | 100 000          |
+| Flop    | 200 000          |
+| Turn    | 300 000          |
+| River   | 1 (determinista) |
 
-## ⚙️ Funcionamiento general
+## 4. Avance de fases (Flop → Turn → River)
 
-1. **Inicialización (Deal):**
-   - Se reparten las manos de los jugadores.
-   - Se genera el board de forma aleatoria o manual.
-   - Se calcula la **equity inicial** de cada jugador.
+Según modo:
 
-2. **Simulación de fases:**
-   - Cada fase (Flop, Turn, River) actualiza el board y recalcula el equity.
-   - El estado del mazo y los jugadores se sincroniza con `GameState`.
+* **Random Board**: se roban cartas automáticamente.
+* **Manual**: se abre `BoardEditorDialog` para escribir las cartas.
 
-3. **Toma de decisiones (Novedad en Práctica 3):**
-   - Cada jugador tiene un **rango** y un **equity mínimo (EM)**.
-   - Si la mano está dentro del rango y el equity ≥ EM → **Bet/Call**.
-   - Si no cumple las condiciones → **Fold**.
-   - En el **Turn**, se calcula la media de outs contra el rango rival para decidir.
+## 5. Toma de decisiones automáticas
 
-4. **Actualización visual:**
-   - La GUI refleja automáticamente las acciones y el estado del juego.
+Cada turno:
+
+* Si modo **Manual**, el jugador elige: `FOLD / CALL / BET`.
+* Si modo **Auto**:
+
+  * Si la mano **no** está en RG → **FOLD**.
+  * Si equity < EM → **FOLD**.
+  * Si equity ≥ EM:
+
+    * Si debe igualar → **CALL**.
+    * Si nadie apostó → **BET**.
 
 ---
 
-## ⚙️ Compilación y ejecución
+# 🔢 Cálculo de equity (Internals)
 
-**Compilación manual:**
+`RealEquityCalculator`:
+
+1. Construye un mazo sin cartas usadas.
+2. Para cada simulación:
+
+   * Completa board y manos desconocidas.
+   * Evalúa con `PokerHandEvaluator.evaluate7`.
+   * Identifica ganador(es).
+3. Reparte puntuación (empates incluidos).
+4. Devuelve equity de cada jugador en **%**.
+
+Si existe `ps-eval.exe`, `PokerStoveAdapter` lo usa automáticamente.
+
+---
+
+# 🎯 Rangos, EM y decisiones automáticas
+
+### Rangos textuales permitidos
+
+```
+JJ+
+ATs-A2s
+88-TT
+KQo
+T8s+
+```
+
+### Rangos por porcentaje
+
+```
+25   → top 25%
+25%  → top 25%
+```
+
+### Validación automática
+
+El sistema marca:
+
+* **RG**: verde si la mano entra en el rango.
+* **EM**: verde si equity ≥ EM.
+
+---
+
+# 🔍 Decisión en el Turn – Outs medios
+
+Este apartado reproduce la lógica pedida en la práctica:
+
+### Entrada:
+
+* Mano del héroe
+* Rango del villano
+* Board de 4 cartas
+* EM deseada
+
+`TurnDecisionLogic`:
+
+1. Expande el rango del villano a manos concretas.
+2. Para cada mano del rival:
+
+   * Recorre todos los **44 rivers posibles**.
+   * Cuenta cuántos producen victoria o empate.
+3. Calcula:
+
+   * Outs medios
+   * Equity aproximada
+4. Devuelve **CALL/FOLD**.
+
+`TurnDecisionDialog` muestra:
+
+* Las cartas gráficamente
+* Outs medios
+* Equity
+* Decisión en verde/rojo
+
+---
+
+# ⚙️ Compilación y ejecución
+
+### Compilación:
+
 ```bash
-javac -d bin -sourcepath src src/tp3/gui/PokerEquityGUI.java
+javac -d bin -sourcepath src src/p3/gui/PokerEquityGUI.java
 ```
 
-**Ejecución:**
+### Ejecución:
+
 ```bash
-java -cp bin tp3.gui.PokerEquityGUI
+java -cp bin p3.gui.PokerEquityGUI
 ```
 
-**Recursos:**
-Asegúrate de copiar las imágenes de cartas:
+### Asegúrate de copiar imágenes:
+
 ```bash
 xcopy resources\cartas bin\cartas /E /I /Y
 ```
 
 ---
 
-## 🧠 Próximos pasos
+# 👤 Autoría
 
-* 🧮 Implementar el cálculo de outs medios (Turn vs rango).
-* 🧠 Ampliar la toma de decisiones con factores de riesgo y pot odds.
-* 🧪 Crear tests unitarios con JUnit 5.
-* 💾 Guardar configuraciones de usuario (rango, equity mínima).
-* 🚀 Optimizar el simulador con hilos (multithreading).
+**Rodrigo Mendoza García**
 
----
+**Pablo Sánchez Lozano**
 
-## 📘 Entorno de desarrollo
+**Alberto Sáenz Pérez**
 
-* **Lenguaje:** Java 17  
-* **Entorno:** Eclipse IDE  
-* **Gestor de versiones:** Git + GitHub  
-* **Flujo de trabajo:** `feature → dev → main`  
-* **.gitignore:**
-  ```
-  .idea/ .vscode/ *.iml
-  .project
-  .classpath
-  .settings/
-  bin/ out/ target/ build/
-  .DS_Store
-  Thumbs.db
-  ```
+**Antonio García Rodrigo**
 
----
+Grado en Ingeniería de Datos e IA – *Universidad Complutense de Madrid*
 
-## ✉️ Nota final
+Proyecto desarrollado para la **Práctica – Juegos de Azar**, integrando:
 
-> Este proyecto corresponde a la **Práctica 3**, centrada en la automatización de decisiones y simulación de estrategias en Texas Hold’em.  
-> La base de cálculo de equity se hereda de la práctica anterior, pero el foco actual está en la toma de decisiones y la integración de la inteligencia básica de juego.
+* Evaluación de manos
+* Cálculo de equity
+* Simulación de rondas
+* Decisiones automáticas
+* Análisis de outs y estrategias simples
